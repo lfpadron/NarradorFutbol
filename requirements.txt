@@ -1,0 +1,6 @@
+statsbombpy
+pandas
+duckdb
+pyarrow
+tqdm
+python-dotenv

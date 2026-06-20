@@ -1,0 +1,17 @@
+[project]
+name = "narrador-futbol"
+version = "0.1.0"
+description = "Base de ingesta raw para Narrador Inteligente de Futbol con StatsBomb Open Data."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb",
+    "pandas",
+    "pyarrow",
+    "python-dotenv",
+    "statsbombpy",
+    "tqdm",
+]
+
+[tool.uv]
+package = false
