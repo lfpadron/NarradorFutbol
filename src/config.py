@@ -25,6 +25,7 @@ DATA_DIR = _resolve_data_dir()
 RAW_DIR = DATA_DIR / "raw"
 METADATA_DIR = DATA_DIR / "metadata"
 ANALYTICS_DIR = DATA_DIR / "analytics"
+ANALYTICS_EXPORTS_DIR = ANALYTICS_DIR / "exports"
 
 RAW_COMPETITIONS_DIR = RAW_DIR / "competitions"
 RAW_MATCHES_DIR = RAW_DIR / "matches"
@@ -50,7 +51,7 @@ RAW_DIRECTORIES = (
 def ensure_directories() -> None:
     """Create the project data directories used by ingestion."""
 
-    for directory in (*RAW_DIRECTORIES, METADATA_DIR, ANALYTICS_DIR):
+    for directory in (*RAW_DIRECTORIES, METADATA_DIR, ANALYTICS_DIR, ANALYTICS_EXPORTS_DIR):
         directory.mkdir(parents=True, exist_ok=True)
 
 

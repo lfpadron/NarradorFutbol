@@ -4,3 +4,5 @@ duckdb
 pyarrow
 tqdm
 python-dotenv
+streamlit
+plotly

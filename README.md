@@ -57,6 +57,12 @@ narrador-futbol/
 |- requirements.txt
 |- .gitignore
 |- .env.example
+|- app/
+|  |- streamlit_app.py
+|  `- pages/
+|     |- 01_Ingesta.py
+|     |- 02_Partidos.py
+|     `- 03_Analisis.py
 |- data/
 |  |- raw/
 |  |  |- competitions/
@@ -75,14 +81,29 @@ narrador-futbol/
    |  |- download_lineups.py
    |  |- download_360.py
    |  `- run_ingestion.py
-   `- transform/
-      |- build_duckdb.py
-      |- normalize_competitions.py
-      |- normalize_matches.py
-      |- normalize_lineups.py
-      |- normalize_events.py
-      |- normalize_360.py
-      `- schema.py
+   |- transform/
+   |  |- build_duckdb.py
+   |  |- normalize_competitions.py
+   |  |- normalize_matches.py
+   |  |- normalize_lineups.py
+   |  |- normalize_events.py
+   |  |- normalize_360.py
+   |  `- schema.py
+   |- analytics/
+   |  |- db.py
+   |  |- match_summary.py
+   |  |- team_stats.py
+   |  |- player_stats.py
+   |  |- shot_analysis.py
+   |  |- pass_analysis.py
+   |  |- possession_analysis.py
+   |  |- momentum.py
+   |  |- key_moments.py
+   |  |- ai_context.py
+   |  `- run_analysis.py
+   `- ui/
+      |- formatters.py
+      `- charts.py
 ```
 
 ## Raw JSON
@@ -189,4 +210,67 @@ SELECT COUNT(*) FROM event;
 SELECT COUNT(*) FROM pass;
 SELECT COUNT(*) FROM shot;
 ```
+
+## Capa analytics
+
+La Fase 3 calcula metricas futbolisticas sobre `data/analytics/statsbomb.duckdb`.
+No modifica raw JSON ni reconstruye la base; solo lee tablas y vistas analiticas.
+
+Listar partidos transformados:
+
+```bash
+uv run python -m src.analytics.run_analysis --list-matches
+```
+
+Analizar un partido:
+
+```bash
+uv run python -m src.analytics.run_analysis --match-id 3754078
+```
+
+Exportar contexto analitico JSON:
+
+```bash
+uv run python -m src.analytics.run_analysis --match-id 3754078 --export-json
+```
+
+El export se guarda en:
+
+- `data/analytics/exports/analysis.match-{match_id}.json`
+
+La salida incluye:
+
+- `match_summary`
+- `team_stats`
+- `player_stats`
+- `top_players`
+- `shot_summary`
+- `pass_summary`
+- `possession_summary`
+- `momentum`
+- `key_moments`
+
+## Ejecutar interfaz Streamlit
+
+La Fase 4 agrega una interfaz local para revisar el estado del pipeline, listar partidos transformados y explorar el analisis de un partido.
+
+```bash
+uv run streamlit run app/streamlit_app.py
+```
+
+Flujo recomendado desde cero para una prueba corta:
+
+```bash
+uv run python -m src.ingestion.run_ingestion --limit 3
+uv run python -m src.transform.build_duckdb --limit 3 --force
+uv run python -m src.analytics.run_analysis --list-matches
+uv run streamlit run app/streamlit_app.py
+```
+
+La app incluye:
+
+- pagina principal con estado de `data/analytics/statsbomb.duckdb`
+- pagina de ingesta con resumen de `ingestion_log.duckdb`
+- pagina de partidos transformados con filtros basicos
+- pagina de analisis con resumen, stats por equipo, top jugadores, tiros, pases, posesion, momentum, momentos clave y export JSON
 # NarradorFutbol
