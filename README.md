@@ -67,14 +67,22 @@ narrador-futbol/
 |  `- metadata/
 `- src/
    |- config.py
-   `- ingestion/
-      |- ingestion_log.py
-      |- download_competitions.py
-      |- download_matches.py
-      |- download_events.py
-      |- download_lineups.py
-      |- download_360.py
-      `- run_ingestion.py
+   |- ingestion/
+   |  |- ingestion_log.py
+   |  |- download_competitions.py
+   |  |- download_matches.py
+   |  |- download_events.py
+   |  |- download_lineups.py
+   |  |- download_360.py
+   |  `- run_ingestion.py
+   `- transform/
+      |- build_duckdb.py
+      |- normalize_competitions.py
+      |- normalize_matches.py
+      |- normalize_lineups.py
+      |- normalize_events.py
+      |- normalize_360.py
+      `- schema.py
 ```
 
 ## Raw JSON
@@ -112,4 +120,73 @@ Estados validos:
 - `transformed`
 
 El proceso es reejecutable. Si un archivo ya existe y no usas `--force`, no se descarga otra vez y se registra `skipped_existing`.
+
+## Transformacion analitica
+
+La Fase 2 transforma los JSON raw descargados a una base DuckDB local:
+
+- `data/analytics/statsbomb.duckdb`
+
+Construir o actualizar la base con los partidos que ya tengan archivo raw de events:
+
+```bash
+uv run python -m src.transform.build_duckdb
+```
+
+Prueba limitada:
+
+```bash
+uv run python -m src.transform.build_duckdb --limit 3 --force
+```
+
+Transformar un partido especifico:
+
+```bash
+uv run python -m src.transform.build_duckdb --match-id 7298 --force
+```
+
+Tablas creadas:
+
+- `competition`
+- `season`
+- `match`
+- `team`
+- `player`
+- `lineup`
+- `event`
+- `pass`
+- `shot`
+- `carry`
+- `duel`
+- `pressure`
+- `foul`
+- `goalkeeper_action`
+- `substitution`
+- `event_relationship`
+- `freeze_frame`
+- `visible_area`
+- `transformation_log`
+
+Vistas creadas:
+
+- `vw_match_summary`
+- `vw_shots`
+- `vw_goals`
+- `vw_passes`
+- `vw_team_event_counts`
+- `vw_player_event_counts`
+- `vw_ai_match_context`
+
+Cada evento conserva el JSON original serializado en `event.raw_event_json`.
+
+Ejemplos de consultas DuckDB:
+
+```sql
+SELECT * FROM vw_match_summary LIMIT 10;
+SELECT * FROM vw_shots WHERE match_id = 7298;
+SELECT * FROM vw_goals WHERE match_id = 7298;
+SELECT COUNT(*) FROM event;
+SELECT COUNT(*) FROM pass;
+SELECT COUNT(*) FROM shot;
+```
 # NarradorFutbol

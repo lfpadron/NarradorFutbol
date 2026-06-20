@@ -549,6 +549,7 @@ def create_views(connection: duckdb.DuckDBPyConnection) -> None:
             away_team_name,
             home_score,
             away_score,
+            total_events,
             total_shots,
             total_goals,
             total_passes,

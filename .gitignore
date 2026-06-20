@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.uv-cache/
 
 data/raw/**
 !data/raw/
@@ -27,3 +28,7 @@ data/metadata/*.duckdb.wal
 data/metadata/*.parquet
 data/metadata/*.csv
 !data/metadata/.gitkeep
+
+data/analytics/*.duckdb
+data/analytics/*.duckdb.wal
+!data/analytics/.gitkeep
