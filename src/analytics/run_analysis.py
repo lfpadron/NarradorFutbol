@@ -128,6 +128,69 @@ def print_context(context: dict[str, Any]) -> None:
             f"pressures={player.get('pressures')}"
         )
 
+    print("\nDominance / Dominio")
+    for team in context.get("dominance", []):
+        print(
+            f"- {team.get('team_name')}: score={team.get('dominance_score')}, "
+            f"shots={team.get('shots')}, xG={float(team.get('xg') or 0):.2f}, "
+            f"final_third_entries={team.get('final_third_entries')}, "
+            f"progressive_passes={team.get('progressive_passes')}"
+        )
+
+    print("\nxG breakdown")
+    for team in context.get("xg_breakdown", []):
+        print(
+            f"- {team.get('team_name')}: shots={team.get('shots')}, goals={team.get('goals')}, "
+            f"xG={float(team.get('xg_total') or 0):.2f}, "
+            f"best_chance={float(team.get('best_chance') or 0):.2f} "
+            f"at minute {team.get('best_chance_minute')}"
+        )
+
+    dangerous_attacks = context.get("dangerous_attacks", [])
+    print(f"\nDangerous attacks / Ataques peligrosos: {len(dangerous_attacks)}")
+    for attack in dangerous_attacks[:10]:
+        print(
+            f"- possession={attack.get('possession')} | {attack.get('team_name')} | "
+            f"{attack.get('start_minute')}-{attack.get('end_minute')} min | "
+            f"xG={float(attack.get('xg') or 0):.2f} | shot={attack.get('has_shot')} | "
+            f"goal={attack.get('has_goal')}"
+        )
+
+    print("\nImpact players / Jugadores de impacto")
+    for player in context.get("impact_players", []):
+        print(
+            f"- {player.get('player_name')} ({player.get('team_name')}): "
+            f"score={player.get('impact_score')}, goals={player.get('goals')}, "
+            f"assists={player.get('assists')}, key_passes={player.get('key_passes')}, "
+            f"progressive_passes={player.get('progressive_passes')}"
+        )
+
+    validation = context.get("validation", {})
+    print(f"\nValidation / Validacion: {validation.get('status')}")
+    findings = validation.get("findings", [])
+    if not findings:
+        print("- No validation findings.")
+    for finding in findings:
+        print(
+            f"- [{finding.get('severity')}] {finding.get('code')}: "
+            f"{finding.get('message')} rows={finding.get('rows')}"
+        )
+
+    comparison = context.get("reference_comparison", {})
+    target = comparison.get("target", {})
+    print("\nReference comparison / Comparacion con referencia")
+    print(
+        f"- winner={target.get('winner')} | dominance={target.get('estimated_dominance')} | "
+        f"home_xG={target.get('home_xg')} | away_xG={target.get('away_xg')} | "
+        f"home_shots={target.get('home_shots')} | away_shots={target.get('away_shots')}"
+    )
+    influential = target.get("most_influential_player")
+    if influential:
+        print(
+            f"- most_influential_player={influential.get('player_name')} "
+            f"({influential.get('team_name')}) score={influential.get('impact_score')}"
+        )
+
     print("\nKey moments")
     key_moments = context["key_moments"][:12]
     if not key_moments:

@@ -28,18 +28,37 @@ def momentum_line(momentum_rows: list[dict[str, Any]]) -> go.Figure:
     if frame.empty:
         return _empty_figure("Sin momentum")
     frame["interval_label"] = frame["interval_start"].astype(str) + "-" + frame["interval_end"].astype(str)
-    return px.line(
+    figure = px.line(
         frame,
         x="interval_start",
         y="momentum_score",
         color="team_name",
         markers=True,
+        hover_data={
+            "interval_label": True,
+            "shots": True,
+            "xg": ":.2f",
+            "final_third_entries": True,
+            "attacking_events": True,
+        },
         labels={
             "interval_start": "Minuto",
             "momentum_score": "Momentum",
             "team_name": "Equipo",
+            "interval_label": "Intervalo",
+            "shots": "Tiros",
+            "xg": "xG",
+            "final_third_entries": "Entradas al tercio final",
+            "attacking_events": "Eventos ofensivos",
         },
     )
+    figure.update_layout(
+        title="Momentum por intervalos",
+        hovermode="x unified",
+        template="plotly_white",
+        yaxis_title="Momentum score",
+    )
+    return figure
 
 
 def _empty_figure(title: str) -> go.Figure:

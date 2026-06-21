@@ -41,6 +41,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only process matches with failed statuses in the ingestion log.",
     )
+    parser.add_argument(
+        "--match-id",
+        type=int,
+        default=None,
+        help="Only process one specific match_id for events, lineups and 360.",
+    )
     return parser.parse_args()
 
 
@@ -102,6 +108,16 @@ def main() -> None:
                 if as_int(record.get("match_id")) in failed_ids
             ]
             print(f"retry_failed matches: {len(match_records)}")
+
+        if args.match_id is not None:
+            match_records = [
+                record
+                for record in match_records
+                if as_int(record.get("match_id")) == args.match_id
+            ]
+            if not match_records:
+                raise SystemExit(f"match_id={args.match_id} not found in all_matches index.")
+            print(f"selected match_id: {args.match_id}")
 
         if args.limit is not None:
             match_records = match_records[: args.limit]

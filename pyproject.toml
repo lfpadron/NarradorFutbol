@@ -6,12 +6,15 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "duckdb",
+    "matplotlib>=3.11.0",
+    "mplsoccer>=1.6.1",
     "pandas",
     "plotly>=6.8.0",
     "pyarrow",
     "python-dotenv",
     "statsbombpy",
     "streamlit>=1.58.0",
+    "textual>=8.2.7",
     "tqdm",
 ]
 

@@ -4,14 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.analytics.advanced_metrics import get_impact_players
+from src.analytics.dangerous_attacks import get_dangerous_attacks
+from src.analytics.dominance_analysis import get_dominance_intervals, get_match_dominance
 from src.analytics.key_moments import get_key_moments
 from src.analytics.match_summary import get_match_summary
+from src.analytics.match_validation import compare_against_reference, validate_match
 from src.analytics.momentum import get_momentum_by_interval
 from src.analytics.pass_analysis import get_pass_summary
 from src.analytics.player_stats import get_player_stats
 from src.analytics.possession_analysis import get_possession_summary
 from src.analytics.shot_analysis import get_shot_summary
 from src.analytics.team_stats import get_team_stats
+from src.analytics.xg_analysis import get_xg_breakdown
 from src.ingestion.utils import to_jsonable
 
 
@@ -27,6 +32,13 @@ def build_ai_match_context(match_id: int) -> dict[str, Any]:
         "possession_summary": get_possession_summary(match_id),
         "momentum": get_momentum_by_interval(match_id),
         "key_moments": get_key_moments(match_id),
+        "dominance": get_match_dominance(match_id),
+        "dominance_intervals": get_dominance_intervals(match_id),
+        "dangerous_attacks": get_dangerous_attacks(match_id),
+        "impact_players": get_impact_players(match_id),
+        "xg_breakdown": get_xg_breakdown(match_id),
+        "validation": validate_match(match_id),
+        "reference_comparison": compare_against_reference(match_id),
     }
     return to_jsonable(context)
 

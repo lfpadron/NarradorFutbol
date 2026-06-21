@@ -6,3 +6,6 @@ tqdm
 python-dotenv
 streamlit
 plotly
+textual
+mplsoccer
+matplotlib

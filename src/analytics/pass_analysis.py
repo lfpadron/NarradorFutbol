@@ -66,15 +66,69 @@ def get_progressive_passes(match_id: int) -> list[dict[str, Any]]:
             e.location_y,
             p.pass_end_x,
             p.pass_end_y,
-            ABS(p.pass_end_x - e.location_x) AS progressive_distance,
+            p.pass_end_x - e.location_x AS progressive_distance,
             p.pass_outcome_name
         FROM event e
         INNER JOIN "pass" p ON p.event_id = e.event_id
         WHERE e.match_id = ?
           AND e.location_x IS NOT NULL
           AND p.pass_end_x IS NOT NULL
-          AND ABS(p.pass_end_x - e.location_x) >= 10
+          AND p.pass_outcome_name IS NULL
+          AND e.location_x < 80
+          AND p.pass_end_x >= 80
         ORDER BY progressive_distance DESC, e.minute, e.second
         """,
         (match_id,),
     )
+
+
+def get_pass_network(match_id: int, team_name: str) -> dict[str, Any]:
+    nodes = query_records(
+        """
+        WITH player_locations AS (
+            SELECT
+                e.player_id,
+                e.player_name,
+                AVG(e.location_x) AS avg_x,
+                AVG(e.location_y) AS avg_y,
+                COUNT(*) AS touches
+            FROM event e
+            WHERE e.match_id = ?
+              AND e.team_name = ?
+              AND e.player_id IS NOT NULL
+              AND e.location_x IS NOT NULL
+              AND e.location_y IS NOT NULL
+            GROUP BY e.player_id, e.player_name
+        )
+        SELECT player_id, player_name, avg_x, avg_y, touches
+        FROM player_locations
+        ORDER BY touches DESC, player_name
+        """,
+        (match_id, team_name),
+    )
+    edges = query_records(
+        """
+        SELECT
+            e.player_id AS source_player_id,
+            e.player_name AS source_player_name,
+            p.recipient_player_id AS target_player_id,
+            p.recipient_player_name AS target_player_name,
+            COUNT(*) AS weight
+        FROM event e
+        INNER JOIN "pass" p ON p.event_id = e.event_id
+        WHERE e.match_id = ?
+          AND e.team_name = ?
+          AND p.pass_outcome_name IS NULL
+          AND e.player_id IS NOT NULL
+          AND p.recipient_player_id IS NOT NULL
+        GROUP BY
+            e.player_id,
+            e.player_name,
+            p.recipient_player_id,
+            p.recipient_player_name
+        HAVING COUNT(*) >= 2
+        ORDER BY weight DESC
+        """,
+        (match_id, team_name),
+    )
+    return {"team_name": team_name, "nodes": nodes, "edges": edges}

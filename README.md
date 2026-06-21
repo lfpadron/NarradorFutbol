@@ -2,14 +2,18 @@
 
 Base de ingesta para construir un narrador inteligente de futbol usando datos abiertos de StatsBomb.
 
-Esta primera iteracion solo cubre el cimiento del proyecto:
+El proyecto ya cubre las primeras capas del sistema:
 
 - descarga de datos StatsBomb Open Data
 - guardado raw en JSON, sin transformaciones analiticas
 - indice maestro de partidos
 - bitacora persistente de ingesta en DuckDB
+- transformacion analitica a DuckDB
+- metricas futbolisticas
+- interfaz Streamlit basica
+- TUI local de control
 
-No incluye todavia Streamlit, transformaciones analiticas a DuckDB, graficas ni narracion AI.
+No incluye todavia narrador AI ni exportadores PDF/DOCX.
 
 ## Instalacion
 
@@ -47,6 +51,12 @@ Reintentar solo partidos con algun estado `failed` en la bitacora:
 uv run python -m src.ingestion.run_ingestion --retry-failed
 ```
 
+Descargar eventos, alineaciones y 360 de un partido especifico:
+
+```bash
+uv run python -m src.ingestion.run_ingestion --match-id 7534
+```
+
 ## Estructura
 
 ```text
@@ -55,6 +65,7 @@ narrador-futbol/
 |- pyproject.toml
 |- uv.lock
 |- requirements.txt
+|- control_tui.bat
 |- .gitignore
 |- .env.example
 |- app/
@@ -91,19 +102,28 @@ narrador-futbol/
    |  `- schema.py
    |- analytics/
    |  |- db.py
+   |  |- advanced_metrics.py
+   |  |- dangerous_attacks.py
+   |  |- dominance_analysis.py
+   |  |- match_validation.py
    |  |- match_summary.py
    |  |- team_stats.py
    |  |- player_stats.py
    |  |- shot_analysis.py
    |  |- pass_analysis.py
+   |  |- pressure_analysis.py
    |  |- possession_analysis.py
    |  |- momentum.py
    |  |- key_moments.py
+   |  |- xg_analysis.py
    |  |- ai_context.py
    |  `- run_analysis.py
-   `- ui/
-      |- formatters.py
-      `- charts.py
+   |- ui/
+   |  |- formatters.py
+   |  |- charts.py
+   |  `- pitch_charts.py
+   `- tui/
+      `- control_tui.py
 ```
 
 ## Raw JSON
@@ -249,6 +269,36 @@ La salida incluye:
 - `possession_summary`
 - `momentum`
 - `key_moments`
+- `dominance`
+- `dominance_intervals`
+- `dangerous_attacks`
+- `impact_players`
+- `xg_breakdown`
+- `validation`
+- `reference_comparison`
+
+## Validacion futbolistica avanzada
+
+La fase actual agrega una capa de enriquecimiento y validacion sobre el partido transformado.
+Estas metricas no modifican datos raw ni escriben tablas analiticas nuevas; se calculan leyendo DuckDB.
+
+Metricas principales:
+
+- dominio por equipo: tiros, xG, entradas al ultimo tercio, pases progresivos y score de dominio
+- intervalos de dominio cada 5 minutos
+- ataques peligrosos por posesion
+- desglose de xG por equipo
+- jugadores de impacto
+- validacion automatica de anomalias basicas
+- comparacion contra el partido referencia Mexico vs Alemania 2018 (`match_id=7534`)
+
+Ejemplo recomendado:
+
+```bash
+uv run python -m src.analytics.run_analysis --match-id 7534 --export-json
+```
+
+El JSON exportado `data/analytics/exports/analysis.match-7534.json` incluye los bloques avanzados para futuras fases de curaduria y narracion.
 
 ## Ejecutar interfaz Streamlit
 
@@ -272,5 +322,44 @@ La app incluye:
 - pagina principal con estado de `data/analytics/statsbomb.duckdb`
 - pagina de ingesta con resumen de `ingestion_log.duckdb`
 - pagina de partidos transformados con filtros basicos
-- pagina de analisis con resumen, stats por equipo, top jugadores, tiros, pases, posesion, momentum, momentos clave y export JSON
-# NarradorFutbol
+- pagina de analisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presion, posesion, momentum, analisis avanzado, momentos clave y export JSON
+
+Visualizaciones futbolisticas disponibles:
+
+- mapa de tiros en cancha StatsBomb 120x80
+- xG acumulado por equipo
+- mapa de pases progresivos con flechas
+- mapa de presiones
+- red simple de pases por equipo
+- momentum por intervalos con tooltip
+- panel/timeline de momentos clave
+- tablas de dominio, xG, ataques peligrosos, jugadores de impacto y validacion
+
+Dependencias visuales principales:
+
+- `streamlit`
+- `plotly`
+- `mplsoccer`
+- `matplotlib`
+
+## TUI de control
+
+La TUI permite controlar Streamlit desde terminal:
+
+- ver estado encendido/apagado
+- arrancar Streamlit
+- abrir el navegador en `http://localhost:8501`
+- apagar Streamlit
+- ver logs del proceso
+
+Desde la raiz del proyecto:
+
+```bash
+control_tui.bat
+```
+
+Comando equivalente:
+
+```bash
+uv run python -m src.tui.control_tui
+```

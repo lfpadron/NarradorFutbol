@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .venv/
 .uv-cache/
+.tmp/
 
 data/raw/**
 !data/raw/
