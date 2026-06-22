@@ -17,6 +17,12 @@ from src.analytics.shot_analysis import get_shot_summary, get_shots
 from src.analytics.team_stats import get_team_stats
 from src.config import ANALYTICS_EXPORTS_DIR
 from src.ingestion.utils import to_jsonable
+from src.narrative.config import SUPPORTED_TONES, has_openai_api_key
+from src.narrative.narrative_store import save_narrative
+from src.narrative.narrator import generate_match_narrative
+from src.narrative.quality_checker import evaluate_narrative_quality
+from src.narrative.review_report import build_review_report, save_review_report
+from src.narrative.tone_comparison import compare_tones
 from src.ui.charts import momentum_line, shot_count_bar, xg_bar
 from src.ui.formatters import format_float, format_pct, format_score
 from src.ui.pitch_charts import (
@@ -115,6 +121,7 @@ tabs = st.tabs(
         "Presión",
         "Momentum",
         "Análisis avanzado",
+        "Narrador AI",
         "Momentos clave",
         "Datos",
     ]
@@ -281,6 +288,129 @@ with tabs[5]:
     st.json(to_jsonable(context.get("reference_comparison", {})), expanded=False)
 
 with tabs[6]:
+    st.subheader("Narrador AI")
+    tone_label_to_value = {label: value for value, label in SUPPORTED_TONES.items()}
+    selected_tone_label = st.selectbox("Tono", list(tone_label_to_value.keys()))
+    selected_tone = tone_label_to_value[selected_tone_label]
+    api_key_available = has_openai_api_key()
+    use_api = st.checkbox("usar OpenAI API", value=api_key_available)
+
+    if not api_key_available:
+        st.warning("OPENAI_API_KEY no está configurada. Se generará narrativa local de respaldo.")
+
+    result_key = f"narrative_result_{match_id}_{selected_tone}"
+    quality_key = f"narrative_quality_{match_id}_{selected_tone}"
+    comparison_key = f"tone_comparison_{match_id}"
+    review_key = f"review_report_{match_id}"
+    action_cols = st.columns(2)
+    if action_cols[0].button("Generar narración"):
+        with st.spinner("Generando narración..."):
+            st.session_state[result_key] = generate_match_narrative(
+                match_id,
+                selected_tone,
+                use_api=use_api,
+            )
+
+    current_result = st.session_state.get(result_key)
+    if action_cols[1].button("Guardar narración", disabled=current_result is None):
+        if current_result:
+            md_path, json_path = save_narrative(current_result)
+            st.success(f"Narración guardada: {md_path} | {json_path}")
+
+    review_cols = st.columns(3)
+    if review_cols[0].button("Evaluar calidad"):
+        with st.spinner("Evaluando calidad narrativa..."):
+            if current_result is None:
+                current_result = generate_match_narrative(match_id, selected_tone, use_api=use_api)
+                st.session_state[result_key] = current_result
+            st.session_state[quality_key] = evaluate_narrative_quality(
+                str(current_result.get("narrative_markdown") or ""),
+                context,
+            )
+
+    if review_cols[1].button("Comparar tonos"):
+        with st.spinner("Comparando tonos..."):
+            st.session_state[comparison_key] = compare_tones(match_id, tones=None, use_api=use_api)
+
+    if review_cols[2].button("Guardar revisión"):
+        with st.spinner("Construyendo revisión..."):
+            report = build_review_report(match_id, use_api=use_api)
+            md_path, json_path = save_review_report(report)
+            st.session_state[review_key] = report
+            st.success(f"Revisión guardada: {md_path} | {json_path}")
+
+    if current_result:
+        status_cols = st.columns(3)
+        status_cols[0].metric("Status", current_result.get("status"))
+        status_cols[1].metric("Modelo", current_result.get("model"))
+        status_cols[2].metric("Tono", SUPPORTED_TONES.get(str(current_result.get("tone")), "N/D"))
+
+        warnings = current_result.get("warnings", [])
+        if warnings:
+            st.warning("Fact guard generó advertencias.")
+            for warning in warnings:
+                st.write(f"- {warning}")
+        else:
+            st.success("Fact guard sin advertencias.")
+
+        st.markdown(str(current_result.get("narrative_markdown") or ""))
+    else:
+        st.info("Genera una narración para el partido seleccionado.")
+
+    quality = st.session_state.get(quality_key)
+    if quality:
+        st.subheader("Evaluación de calidad")
+        quality_cols = st.columns(6)
+        quality_cols[0].metric("Overall", quality.get("overall_score"))
+        quality_cols[1].metric("Factualidad", quality.get("factuality_score"))
+        quality_cols[2].metric("Cobertura", quality.get("coverage_score"))
+        quality_cols[3].metric("Claridad", quality.get("clarity_score"))
+        quality_cols[4].metric("Emoción", quality.get("excitement_score"))
+        quality_cols[5].metric("Táctica", quality.get("tactical_depth_score"))
+
+        element_cols = st.columns(2)
+        with element_cols[0]:
+            st.write("Detectado")
+            st.write(quality.get("detected_elements", []))
+        with element_cols[1]:
+            st.write("Faltante")
+            st.write(quality.get("missing_elements", []))
+
+        quality_warnings = quality.get("warnings", [])
+        if quality_warnings:
+            st.warning("Advertencias de calidad")
+            for warning in quality_warnings:
+                st.write(f"- {warning}")
+
+    comparison = st.session_state.get(comparison_key)
+    if comparison:
+        st.subheader("Comparación de tonos")
+        comparison_rows = []
+        for row in comparison.get("tones", []):
+            comparison_rows.append(
+                {
+                    "tono": row.get("tone_label") or row.get("tone"),
+                    "status": row.get("status"),
+                    "overall": row.get("overall_score"),
+                    "factualidad": row.get("factuality_score"),
+                    "cobertura": row.get("coverage_score"),
+                    "claridad": row.get("clarity_score"),
+                    "emoción": row.get("excitement_score"),
+                    "táctica": row.get("tactical_depth_score"),
+                    "warnings": len(row.get("warnings", [])),
+                }
+            )
+        st.dataframe(pd.DataFrame(comparison_rows), width="stretch")
+        st.success(f"Mejor tono sugerido: {comparison.get('best_tone_label') or comparison.get('best_tone')}")
+
+    review_report = st.session_state.get(review_key)
+    if review_report:
+        st.subheader("Revisión guardada")
+        st.write("Recomendaciones")
+        for recommendation in review_report.get("recommendations", []):
+            st.write(f"- {recommendation}")
+
+with tabs[7]:
     st.subheader("Momentos clave")
     st.write("Timeline simple con goles, ocasiones claras, tarjetas, penaltis, asistencias y cambios.")
     key_moments = detail["key_moments"]
@@ -303,7 +433,7 @@ with tabs[6]:
                     }
                 )
 
-with tabs[7]:
+with tabs[8]:
     st.subheader("Datos")
     st.write("Tablas de respaldo y export del contexto analítico para futuras fases.")
     data_tabs = st.tabs(

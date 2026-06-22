@@ -1,0 +1,44 @@
+PowerShell 7.6.3
+PS C:\Users\lfpad\Documents\Scripts\NarradorFutbol> uv run python -m src.narrative.run_narrator --match-id 7534
+Resumen del partido
+Germany 0-1 Mexico
+status=generated | tone=cronica_emocionante | model=gpt-4o-mini
+
+Warnings
+- Posible jugador no trazado en contexto: El Estadio Luzhnikí.
+- Posible jugador no trazado en contexto: La Copa.
+
+Narrativa Markdown
+# Resumen ejecutivo
+
+En un emocionante partido de la Copa del Mundo 2018, México se impuso a Alemania por 1-0, gracias a un gol de Hirving Lozano. A pesar de que Alemania dominó en términos de posesión y oportunidades, la eficacia de los mexicanos marcó la diferencia en el marcador.
+
+# Crónica del partido
+
+El Estadio Luzhnikí fue testigo de un encuentro vibrante, donde Alemania, con su habitual dominio, se lanzó al ataque desde el primer minuto. Sin embargo, fue México quien, con una estrategia astuta y un juego sólido, logró llevarse los tres puntos. La primera mitad fue un despliegue de intensidad, con los alemanes acumulando 26 tiros a puerta, pero sin poder concretar. En el minuto 34, un pase magistral de Javier Hernández permitió a Hirving Lozano anotar el único gol del partido, desatando la euforia entre los aficionados mexicanos.
+
+A pesar de los esfuerzos de Alemania, que acumuló un xG de 2.30, su falta de precisión y la destacada actuación del portero mexicano, Guillermo Ochoa, mantuvieron el marcador en cero para los europeos. El segundo tiempo vio a Alemania intensificar su presión, pero cada intento fue frustrado por la defensa mexicana, que se mantuvo firme ante el asedio.
+
+# Claves tácticas
+
+Alemania mostró un enfoque ofensivo, con una alta posesión del balón (84%) y un juego de pases efectivo (84% de precisión). Su estrategia se centró en la creación de oportunidades a través de la acumulación de tiros desde diversas posiciones. Sin embargo, su incapacidad para finalizar las jugadas fue evidente, y el equipo no logró convertir su dominio territorial en goles.
+
+Por otro lado, México adoptó un enfoque más conservador, priorizando la defensa y buscando oportunidades de contraataque. La rapidez y agilidad de sus jugadores fueron cruciales, especialmente en el gol de Lozano, que llegó tras un rápido avance ofensivo.
+
+# Jugadores destacados
+
+- **Hirving Lozano (México)**: El héroe del partido, anotando el único gol y mostrando gran habilidad en el ataque.
+- **Guillermo Ochoa (México)**: Su actuación bajo los tres palos fue fundamental para mantener la portería a cero, realizando varias paradas clave.
+- **Toni Kroos (Alemania)**: A pesar de no anotar, su capacidad para distribuir el balón y crear oportunidades fue notable.
+- **Mario Gómez (Alemania)**: Generó varias ocasiones, pero no logró concretar, destacándose por su esfuerzo en el ataque.
+
+# Momentos clave
+
+- **34'**: Gol de Hirving Lozano tras asistencia de Javier Hernández, poniendo a México en ventaja.
+- **57'**: Ocasión clara de Timo Werner, que no pudo concretar, reflejando la frustración alemana.
+- **88'**: Mario Gómez tuvo una gran oportunidad para empatar, pero su tiro fue salvado por Ochoa, sellando la victoria mexicana.
+
+# Lectura final
+
+Este partido es un claro recordatorio de que en el fútbol, el dominio no siempre se traduce en victoria. Alemania, a pesar de su superioridad en estadísticas, se vio superada por un México que, con un juego inteligente y efectivo, logró llevarse una victoria histórica. La Copa del Mundo siempre tiene sorpresas, y este encuentro es un testimonio de la competitividad y la emoción que ofrece el torneo.
+PS C:\Users\lfpad\Documents\Scripts\NarradorFutbol>

@@ -12,8 +12,9 @@ El proyecto ya cubre las primeras capas del sistema:
 - metricas futbolisticas
 - interfaz Streamlit basica
 - TUI local de control
+- Narrador AI v1 con fallback local sin credenciales
 
-No incluye todavia narrador AI ni exportadores PDF/DOCX.
+No incluye todavia exportadores PDF/DOCX.
 
 ## Instalacion
 
@@ -118,6 +119,17 @@ narrador-futbol/
    |  |- xg_analysis.py
    |  |- ai_context.py
    |  `- run_analysis.py
+   |- narrative/
+   |  |- config.py
+   |  |- prompt_builder.py
+   |  |- narrator.py
+   |  |- templates.py
+   |  |- fact_guard.py
+   |  |- quality_checker.py
+   |  |- tone_comparison.py
+   |  |- review_report.py
+   |  |- narrative_store.py
+   |  `- run_narrator.py
    |- ui/
    |  |- formatters.py
    |  |- charts.py
@@ -300,6 +312,91 @@ uv run python -m src.analytics.run_analysis --match-id 7534 --export-json
 
 El JSON exportado `data/analytics/exports/analysis.match-7534.json` incluye los bloques avanzados para futuras fases de curaduria y narracion.
 
+## Narrador AI
+
+La fase Narrador AI v1 genera una narracion en Markdown desde el contexto curado de `src/analytics/ai_context.py`.
+La IA no lee todos los eventos crudos; recibe resumen del partido, metricas, dominio, ataques peligrosos, momentos clave, jugadores de impacto y validacion.
+
+Variables opcionales en `.env`:
+
+```env
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+```
+
+Si `OPENAI_API_KEY` no existe, el sistema no falla: usa una narrativa local de respaldo basada en plantilla.
+
+Generar sin API:
+
+```bash
+uv run python -m src.narrative.run_narrator --match-id 7534 --no-api
+```
+
+Generar con API y guardar Markdown/JSON:
+
+```bash
+uv run python -m src.narrative.run_narrator --match-id 7534 --save
+```
+
+Cambiar tono:
+
+```bash
+uv run python -m src.narrative.run_narrator --match-id 7534 --tone analisis_tecnico
+```
+
+Archivos generados:
+
+- `data/analytics/exports/narrative.match-7534.cronica_emocionante.md`
+- `data/analytics/exports/narrative.match-7534.cronica_emocionante.json`
+
+Tonos disponibles:
+
+- `cronica_emocionante`
+- `analisis_tecnico`
+- `resumen_ejecutivo`
+- `scouting`
+- `television`
+
+El `fact_guard` agrega advertencias simples si detecta posibles contradicciones con el contexto, como marcador distinto, empate inexistente, goleada no sustentada, penales o rojas no registradas.
+
+## Evaluación del narrador
+
+La fase Narrador AI v1.1 agrega evaluación local de calidad narrativa sin depender de otro LLM.
+El objetivo es revisar si la narración es factual, coherente, útil para analistas, suficientemente emocionante y trazable al contexto analítico.
+
+Evaluar una narrativa:
+
+```bash
+uv run python -m src.narrative.run_narrator --match-id 7534 --no-api --quality
+```
+
+Comparar todos los tonos:
+
+```bash
+uv run python -m src.narrative.run_narrator --match-id 7534 --no-api --compare-tones
+```
+
+Guardar reporte de revisión:
+
+```bash
+uv run python -m src.narrative.run_narrator --match-id 7534 --no-api --review-save
+```
+
+Archivos generados por la revisión:
+
+- `data/analytics/exports/review.match-7534.md`
+- `data/analytics/exports/review.match-7534.json`
+
+El `quality_checker` usa heurísticas simples para puntuar:
+
+- factualidad
+- cobertura
+- claridad
+- emoción
+- profundidad táctica
+
+El reporte compara tonos, sugiere el mejor y lista advertencias/recomendaciones.
+
 ## Ejecutar interfaz Streamlit
 
 La Fase 4 agrega una interfaz local para revisar el estado del pipeline, listar partidos transformados y explorar el analisis de un partido.
@@ -322,7 +419,7 @@ La app incluye:
 - pagina principal con estado de `data/analytics/statsbomb.duckdb`
 - pagina de ingesta con resumen de `ingestion_log.duckdb`
 - pagina de partidos transformados con filtros basicos
-- pagina de analisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presion, posesion, momentum, analisis avanzado, momentos clave y export JSON
+- pagina de analisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presion, posesion, momentum, analisis avanzado, Narrador AI con evaluacion/comparacion de tonos, momentos clave y export JSON
 
 Visualizaciones futbolisticas disponibles:
 
@@ -341,6 +438,12 @@ Dependencias visuales principales:
 - `plotly`
 - `mplsoccer`
 - `matplotlib`
+
+Ejecutar Streamlit:
+
+```bash
+uv run streamlit run app/streamlit_app.py
+```
 
 ## TUI de control
 

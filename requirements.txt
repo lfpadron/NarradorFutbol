@@ -4,6 +4,7 @@ duckdb
 pyarrow
 tqdm
 python-dotenv
+openai
 streamlit
 plotly
 textual

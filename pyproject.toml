@@ -8,6 +8,7 @@ dependencies = [
     "duckdb",
     "matplotlib>=3.11.0",
     "mplsoccer>=1.6.1",
+    "openai>=2.43.0",
     "pandas",
     "plotly>=6.8.0",
     "pyarrow",
