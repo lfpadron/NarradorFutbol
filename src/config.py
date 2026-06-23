@@ -26,6 +26,7 @@ RAW_DIR = DATA_DIR / "raw"
 METADATA_DIR = DATA_DIR / "metadata"
 ANALYTICS_DIR = DATA_DIR / "analytics"
 ANALYTICS_EXPORTS_DIR = ANALYTICS_DIR / "exports"
+REPORTS_DIR = DATA_DIR / "reports"
 
 RAW_COMPETITIONS_DIR = RAW_DIR / "competitions"
 RAW_MATCHES_DIR = RAW_DIR / "matches"
@@ -38,6 +39,7 @@ ALL_MATCHES_CSV = METADATA_DIR / "all_matches.csv"
 ALL_MATCHES_PARQUET = METADATA_DIR / "all_matches.parquet"
 INGESTION_LOG_DB = METADATA_DIR / "ingestion_log.duckdb"
 ANALYTICS_DB = ANALYTICS_DIR / "statsbomb.duckdb"
+REPORT_HISTORY_DB_PATH = ANALYTICS_DIR / "report_history.duckdb"
 
 RAW_DIRECTORIES = (
     RAW_COMPETITIONS_DIR,
@@ -51,7 +53,13 @@ RAW_DIRECTORIES = (
 def ensure_directories() -> None:
     """Create the project data directories used by ingestion."""
 
-    for directory in (*RAW_DIRECTORIES, METADATA_DIR, ANALYTICS_DIR, ANALYTICS_EXPORTS_DIR):
+    for directory in (
+        *RAW_DIRECTORIES,
+        METADATA_DIR,
+        ANALYTICS_DIR,
+        ANALYTICS_EXPORTS_DIR,
+        REPORTS_DIR,
+    ):
         directory.mkdir(parents=True, exist_ok=True)
 
 

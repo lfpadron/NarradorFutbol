@@ -434,9 +434,9 @@ uv run python -m src.reports.run_report --match-id 7534 --tone analisis_tecnico 
 
 Salidas:
 
-- `data/reports/report.match-7534.cronica_emocionante.md`
-- `data/reports/report.match-7534.cronica_emocionante.html`
-- `data/reports/report.match-7534.cronica_emocionante.json`
+- `data/reports/report.match-7534.cronica_emocionante_YYYYMMDD_HHMMSS.md`
+- `data/reports/report.match-7534.cronica_emocionante_YYYYMMDD_HHMMSS.html`
+- `data/reports/report.match-7534.cronica_emocionante_YYYYMMDD_HHMMSS.json`
 
 El HTML usa CSS embebido y puede abrirse directamente en navegador.
 
@@ -469,9 +469,11 @@ uv run python -m src.reports.run_report --history --match-id 7534
 
 Salidas adicionales:
 
-- `data/reports/report.match-7534.cronica_emocionante.pdf`
-- `data/reports/report.match-7534.cronica_emocionante.docx`
+- `data/reports/report.match-7534.cronica_emocionante_YYYYMMDD_HHMMSS.pdf`
+- `data/reports/report.match-7534.cronica_emocionante_YYYYMMDD_HHMMSS.docx`
 - `data/analytics/report_history.duckdb`
+
+Todos los formatos generados en una misma exportacion comparten el mismo sufijo `_YYYYMMDD_HHMMSS`, por ejemplo `report.match-7534.cronica_emocionante_20260622_233028.html`.
 
 El PDF intenta usar WeasyPrint primero. En Windows, si faltan librerias nativas como `libgobject`, usa un fallback con ReportLab para generar el archivo de todos modos. Si ambos motores fallan, el flujo no se rompe: se guardan Markdown/HTML/JSON/DOCX, se registra `pdf_status=failed` y el error queda en el historial.
 

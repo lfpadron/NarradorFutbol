@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import io
 import re
+from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,15 @@ from src.config import PROJECT_ROOT
 
 def render_pdf_report(html: str, output_path: str) -> dict[str, Any]:
     path = Path(output_path)
+    if not html.strip():
+        return {
+            "status": "failed",
+            "path": path.as_posix(),
+            "error_message": "HTML vacio; no se puede generar PDF.",
+            "warning_message": None,
+            "backend": None,
+        }
+
     weasyprint_output = io.StringIO()
     try:
         with contextlib.redirect_stdout(weasyprint_output), contextlib.redirect_stderr(weasyprint_output):
@@ -135,21 +145,22 @@ def _render_reportlab_pdf(html: str, path: Path) -> dict[str, Any]:
         if not story:
             story.append(Paragraph("Reporte sin contenido renderizable.", body_style))
 
-        document = SimpleDocTemplate(
-            str(path),
-            pagesize=letter,
-            rightMargin=margin,
-            leftMargin=margin,
-            topMargin=margin,
-            bottomMargin=margin,
-            title=path.stem,
-        )
-        document.build(story)
+        written_path, warning_message = _prepare_pdf_output_path(path)
+        try:
+            _write_reportlab_document(written_path, story, margin, letter, SimpleDocTemplate)
+        except PermissionError:
+            written_path = _alternate_pdf_path(path)
+            _write_reportlab_document(written_path, story, margin, letter, SimpleDocTemplate)
+            warning_message = (
+                f"No se pudo sobrescribir {path.name}; "
+                f"se genero {written_path.name}."
+            )
+
         return {
             "status": "generated",
-            "path": path.as_posix(),
+            "path": written_path.as_posix(),
             "error_message": None,
-            "warning_message": None,
+            "warning_message": warning_message,
             "backend": "reportlab",
         }
     except Exception as exc:
@@ -160,6 +171,44 @@ def _render_reportlab_pdf(html: str, path: Path) -> dict[str, Any]:
             "warning_message": None,
             "backend": "reportlab",
         }
+
+
+def _write_reportlab_document(
+    path: Path,
+    story: list[Any],
+    margin: int,
+    page_size: tuple[float, float],
+    document_class: Any,
+) -> None:
+    document = document_class(
+        str(path),
+        pagesize=page_size,
+        rightMargin=margin,
+        leftMargin=margin,
+        topMargin=margin,
+        bottomMargin=margin,
+        title=path.stem,
+    )
+    document.build(list(story))
+
+
+def _prepare_pdf_output_path(path: Path) -> tuple[Path, str | None]:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("ab"):
+            pass
+        return path, None
+    except PermissionError:
+        alternate_path = _alternate_pdf_path(path)
+        return (
+            alternate_path,
+            f"No se pudo sobrescribir {path.name}; se genero {alternate_path.name}.",
+        )
+
+
+def _alternate_pdf_path(path: Path) -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return path.with_name(f"{path.stem}_retry_{timestamp}{path.suffix}")
 
 
 def _build_table(

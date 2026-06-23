@@ -8,11 +8,11 @@ from uuid import uuid4
 
 import duckdb
 
-from src.config import ANALYTICS_DIR
+from src.config import REPORT_HISTORY_DB_PATH
 from src.ingestion.utils import to_jsonable
 
 
-REPORT_HISTORY_DB = ANALYTICS_DIR / "report_history.duckdb"
+REPORT_HISTORY_DB = REPORT_HISTORY_DB_PATH
 
 
 SCHEMA_SQL = """
@@ -118,7 +118,11 @@ def build_history_record(
         "report_id": str(uuid4()),
         "match_id": report.get("match_id"),
         "tone": report.get("tone"),
-        "generated_at": report.get("generated_at"),
+        "generated_at": (
+            save_result.get("exported_at_utc")
+            or save_result.get("exported_at")
+            or report.get("generated_at")
+        ),
         "generated_by": get_generated_by(),
         "use_api": use_api,
         "model": report.get("narrative", {}).get("model"),
@@ -175,4 +179,3 @@ def _query_history(sql: str, params: list[Any]) -> list[dict[str, Any]]:
         frame = connection.execute(sql, params).fetchdf()
     clean = frame.astype(object).where(frame.notnull(), None)
     return [to_jsonable(row) for row in clean.to_dict(orient="records")]
-

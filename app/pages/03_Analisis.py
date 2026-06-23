@@ -473,9 +473,11 @@ with tabs[6]:
                 include_pdf=include_pdf,
                 include_docx=include_docx,
             )
-            record_report_generation(
-                build_history_record(report_bundle["report"], paths, use_api=use_api)
-            )
+            history_record = build_history_record(report_bundle["report"], paths, use_api=use_api)
+            record_report_generation(history_record)
+            paths["generated_by"] = history_record.get("generated_by")
+            paths["generated_at"] = paths.get("exported_at") or history_record.get("generated_at")
+            paths["history_status"] = history_record.get("status")
             st.session_state[final_report_paths_key] = paths
             st.success("Reporte guardado.")
 
@@ -503,6 +505,11 @@ with tabs[6]:
                 st.write(f"- {format_labels[label]}: {path}")
         if not optional_paths:
             st.caption("No se genero ningun formato adicional en esta corrida.")
+
+        audit_cols = st.columns(3)
+        audit_cols[0].metric("Generado por", report_paths.get("generated_by", "local_user"))
+        audit_cols[1].metric("Estado", report_paths.get("history_status", "generated"))
+        audit_cols[2].metric("Fecha", report_paths.get("generated_at", "N/D"))
 
         status_cols = st.columns(2)
         status_cols[0].metric("PDF", report_paths.get("pdf_status", "not_requested"))
