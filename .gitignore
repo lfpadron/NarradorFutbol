@@ -35,3 +35,6 @@ data/analytics/*.duckdb.wal
 data/analytics/exports/*.json
 !data/analytics/.gitkeep
 !data/analytics/exports/.gitkeep
+
+data/reports/*
+!data/reports/.gitkeep

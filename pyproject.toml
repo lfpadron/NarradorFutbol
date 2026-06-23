@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "duckdb",
+    "markdown>=3.10.2",
     "matplotlib>=3.11.0",
     "mplsoccer>=1.6.1",
     "openai>=2.43.0",

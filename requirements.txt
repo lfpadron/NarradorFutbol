@@ -5,6 +5,7 @@ pyarrow
 tqdm
 python-dotenv
 openai
+markdown
 streamlit
 plotly
 textual

@@ -23,6 +23,10 @@ from src.narrative.narrator import generate_match_narrative
 from src.narrative.quality_checker import evaluate_narrative_quality
 from src.narrative.review_report import build_review_report, save_review_report
 from src.narrative.tone_comparison import compare_tones
+from src.reports.html_report import render_html_report
+from src.reports.markdown_report import render_markdown_report
+from src.reports.report_builder import build_match_report
+from src.reports.report_store import save_report
 from src.ui.charts import momentum_line, shot_count_bar, xg_bar
 from src.ui.formatters import format_float, format_pct, format_score
 from src.ui.pitch_charts import (
@@ -302,6 +306,8 @@ with tabs[6]:
     quality_key = f"narrative_quality_{match_id}_{selected_tone}"
     comparison_key = f"tone_comparison_{match_id}"
     review_key = f"review_report_{match_id}"
+    final_report_key = f"final_report_{match_id}_{selected_tone}"
+    final_report_paths_key = f"final_report_paths_{match_id}_{selected_tone}"
     action_cols = st.columns(2)
     if action_cols[0].button("Generar narración"):
         with st.spinner("Generando narración..."):
@@ -409,6 +415,39 @@ with tabs[6]:
         st.write("Recomendaciones")
         for recommendation in review_report.get("recommendations", []):
             st.write(f"- {recommendation}")
+
+    st.subheader("Reporte final")
+    report_cols = st.columns(2)
+    if report_cols[0].button("Generar reporte"):
+        with st.spinner("Generando reporte final..."):
+            final_report = build_match_report(match_id, tone=selected_tone, use_api=use_api)
+            st.session_state[final_report_key] = {
+                "report": final_report,
+                "markdown": render_markdown_report(final_report),
+                "html": render_html_report(final_report),
+            }
+            st.session_state.pop(final_report_paths_key, None)
+
+    report_bundle = st.session_state.get(final_report_key)
+    if report_cols[1].button("Guardar reporte", disabled=report_bundle is None):
+        if report_bundle:
+            paths = save_report(
+                report_bundle["report"],
+                report_bundle["markdown"],
+                report_bundle["html"],
+            )
+            st.session_state[final_report_paths_key] = paths
+            st.success("Reporte guardado.")
+
+    report_paths = st.session_state.get(final_report_paths_key)
+    if report_paths:
+        st.write("Rutas generadas")
+        for label, path in report_paths.items():
+            st.write(f"- {label}: {path}")
+
+    if report_bundle:
+        st.markdown("### Vista previa Markdown")
+        st.markdown(report_bundle["markdown"])
 
 with tabs[7]:
     st.subheader("Momentos clave")

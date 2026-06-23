@@ -13,6 +13,7 @@ El proyecto ya cubre las primeras capas del sistema:
 - interfaz Streamlit basica
 - TUI local de control
 - Narrador AI v1 con fallback local sin credenciales
+- reportes finales en Markdown, HTML y JSON
 
 No incluye todavia exportadores PDF/DOCX.
 
@@ -82,7 +83,8 @@ narrador-futbol/
 |  |  |- events/
 |  |  |- lineups/
 |  |  `- three-sixty/
-|  `- metadata/
+|  |- metadata/
+|  `- reports/
 `- src/
    |- config.py
    |- ingestion/
@@ -130,6 +132,12 @@ narrador-futbol/
    |  |- review_report.py
    |  |- narrative_store.py
    |  `- run_narrator.py
+   |- reports/
+   |  |- report_builder.py
+   |  |- markdown_report.py
+   |  |- html_report.py
+   |  |- report_store.py
+   |  `- run_report.py
    |- ui/
    |  |- formatters.py
    |  |- charts.py
@@ -397,6 +405,37 @@ El `quality_checker` usa heurísticas simples para puntuar:
 
 El reporte compara tonos, sugiere el mejor y lista advertencias/recomendaciones.
 
+## Generar reporte final
+
+La fase de reporte final exportable construye un entregable integral en Markdown, HTML y JSON.
+El reporte combina datos generales, estadísticas principales, análisis avanzado, narración AI, evaluación de calidad narrativa, validación futbolística y trazabilidad.
+
+Generar vista previa sin API:
+
+```bash
+uv run python -m src.reports.run_report --match-id 7534 --no-api
+```
+
+Generar y guardar archivos:
+
+```bash
+uv run python -m src.reports.run_report --match-id 7534 --save --no-api
+```
+
+Cambiar tono:
+
+```bash
+uv run python -m src.reports.run_report --match-id 7534 --tone analisis_tecnico --save --no-api
+```
+
+Salidas:
+
+- `data/reports/report.match-7534.cronica_emocionante.md`
+- `data/reports/report.match-7534.cronica_emocionante.html`
+- `data/reports/report.match-7534.cronica_emocionante.json`
+
+El HTML usa CSS embebido y puede abrirse directamente en navegador.
+
 ## Ejecutar interfaz Streamlit
 
 La Fase 4 agrega una interfaz local para revisar el estado del pipeline, listar partidos transformados y explorar el analisis de un partido.
@@ -419,7 +458,7 @@ La app incluye:
 - pagina principal con estado de `data/analytics/statsbomb.duckdb`
 - pagina de ingesta con resumen de `ingestion_log.duckdb`
 - pagina de partidos transformados con filtros basicos
-- pagina de analisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presion, posesion, momentum, analisis avanzado, Narrador AI con evaluacion/comparacion de tonos, momentos clave y export JSON
+- pagina de analisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presion, posesion, momentum, analisis avanzado, Narrador AI con evaluacion/comparacion de tonos y reporte final, momentos clave y export JSON
 
 Visualizaciones futbolisticas disponibles:
 
