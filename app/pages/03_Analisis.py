@@ -26,6 +26,7 @@ from src.narrative.tone_comparison import compare_tones
 from src.reports.html_report import render_html_report
 from src.reports.markdown_report import render_markdown_report
 from src.reports.report_builder import build_match_report
+from src.reports.report_history import build_history_record, list_report_history, record_report_generation
 from src.reports.report_store import save_report
 from src.ui.charts import momentum_line, shot_count_bar, xg_bar
 from src.ui.formatters import format_float, format_pct, format_score
@@ -417,6 +418,40 @@ with tabs[6]:
             st.write(f"- {recommendation}")
 
     st.subheader("Reporte final")
+    st.caption("Markdown, HTML y JSON se generan siempre al guardar el reporte.")
+    base_format_cols = st.columns(3)
+    base_format_cols[0].checkbox(
+        "Generar Markdown",
+        value=True,
+        disabled=True,
+        key=f"final_report_md_{match_id}_{selected_tone}",
+    )
+    base_format_cols[1].checkbox(
+        "Generar HTML",
+        value=True,
+        disabled=True,
+        key=f"final_report_html_{match_id}_{selected_tone}",
+    )
+    base_format_cols[2].checkbox(
+        "Generar JSON",
+        value=True,
+        disabled=True,
+        key=f"final_report_json_{match_id}_{selected_tone}",
+    )
+
+    st.caption("Formatos adicionales")
+    export_option_cols = st.columns(2)
+    include_pdf = export_option_cols[0].checkbox(
+        "Generar PDF",
+        value=False,
+        key=f"final_report_pdf_{match_id}_{selected_tone}",
+    )
+    include_docx = export_option_cols[1].checkbox(
+        "Generar DOCX",
+        value=True,
+        key=f"final_report_docx_{match_id}_{selected_tone}",
+    )
+
     report_cols = st.columns(2)
     if report_cols[0].button("Generar reporte"):
         with st.spinner("Generando reporte final..."):
@@ -435,19 +470,60 @@ with tabs[6]:
                 report_bundle["report"],
                 report_bundle["markdown"],
                 report_bundle["html"],
+                include_pdf=include_pdf,
+                include_docx=include_docx,
+            )
+            record_report_generation(
+                build_history_record(report_bundle["report"], paths, use_api=use_api)
             )
             st.session_state[final_report_paths_key] = paths
             st.success("Reporte guardado.")
 
     report_paths = st.session_state.get(final_report_paths_key)
     if report_paths:
-        st.write("Rutas generadas")
-        for label, path in report_paths.items():
-            st.write(f"- {label}: {path}")
+        st.write("Formatos base generados")
+        format_labels = {
+            "markdown": "Markdown",
+            "html": "HTML",
+            "json": "JSON",
+            "pdf": "PDF",
+            "docx": "DOCX",
+        }
+        for label in ("markdown", "html", "json"):
+            path = report_paths.get(label)
+            if path:
+                st.write(f"- {format_labels[label]}: {path}")
+
+        st.write("Formatos adicionales")
+        optional_paths = False
+        for label in ("pdf", "docx"):
+            path = report_paths.get(label)
+            if path:
+                optional_paths = True
+                st.write(f"- {format_labels[label]}: {path}")
+        if not optional_paths:
+            st.caption("No se genero ningun formato adicional en esta corrida.")
+
+        status_cols = st.columns(2)
+        status_cols[0].metric("PDF", report_paths.get("pdf_status", "not_requested"))
+        status_cols[1].metric("DOCX", report_paths.get("docx_status", "not_requested"))
+        if report_paths.get("pdf_warning_message"):
+            st.info(f"PDF: {report_paths.get('pdf_warning_message')}")
+        if report_paths.get("pdf_error_message"):
+            st.warning(f"PDF: {report_paths.get('pdf_error_message')}")
+        if report_paths.get("docx_error_message"):
+            st.warning(f"DOCX: {report_paths.get('docx_error_message')}")
 
     if report_bundle:
         st.markdown("### Vista previa Markdown")
         st.markdown(report_bundle["markdown"])
+
+    st.subheader("Historial de reportes")
+    history_rows = list_report_history(limit=25)
+    if history_rows:
+        st.dataframe(pd.DataFrame(history_rows), width="stretch")
+    else:
+        st.info("Todavía no hay reportes registrados en historial.")
 
 with tabs[7]:
     st.subheader("Momentos clave")

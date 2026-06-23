@@ -14,8 +14,9 @@ El proyecto ya cubre las primeras capas del sistema:
 - TUI local de control
 - Narrador AI v1 con fallback local sin credenciales
 - reportes finales en Markdown, HTML y JSON
+- exportadores profesionales en PDF y DOCX
 
-No incluye todavia exportadores PDF/DOCX.
+La app conserva los datos raw sin modificaciones y genera los entregables derivados en `data/`.
 
 ## Instalacion
 
@@ -136,6 +137,9 @@ narrador-futbol/
    |  |- report_builder.py
    |  |- markdown_report.py
    |  |- html_report.py
+   |  |- pdf_report.py
+   |  |- docx_report.py
+   |  |- report_history.py
    |  |- report_store.py
    |  `- run_report.py
    |- ui/
@@ -435,6 +439,43 @@ Salidas:
 - `data/reports/report.match-7534.cronica_emocionante.json`
 
 El HTML usa CSS embebido y puede abrirse directamente en navegador.
+
+## Exportación PDF y DOCX
+
+La Fase 7 completa el exportador profesional:
+
+- PDF ejecutivo desde el HTML del reporte.
+- DOCX editable con secciones y tablas principales.
+- Historial de reportes en DuckDB.
+- Auditoría básica con usuario, fecha, tono, rutas y estados PDF/DOCX.
+
+Generar todo lo disponible:
+
+```bash
+uv run python -m src.reports.run_report --match-id 7534 --save --pdf --docx --no-api
+```
+
+Consultar historial:
+
+```bash
+uv run python -m src.reports.run_report --history
+```
+
+Consultar historial de un partido:
+
+```bash
+uv run python -m src.reports.run_report --history --match-id 7534
+```
+
+Salidas adicionales:
+
+- `data/reports/report.match-7534.cronica_emocionante.pdf`
+- `data/reports/report.match-7534.cronica_emocionante.docx`
+- `data/analytics/report_history.duckdb`
+
+El PDF intenta usar WeasyPrint primero. En Windows, si faltan librerias nativas como `libgobject`, usa un fallback con ReportLab para generar el archivo de todos modos. Si ambos motores fallan, el flujo no se rompe: se guardan Markdown/HTML/JSON/DOCX, se registra `pdf_status=failed` y el error queda en el historial.
+
+El DOCX usa `python-docx` y debe funcionar localmente sin credenciales. El campo `generated_by` del historial usa `NARRADOR_USER_EMAIL`; si no existe, usa `local_user`.
 
 ## Ejecutar interfaz Streamlit
 

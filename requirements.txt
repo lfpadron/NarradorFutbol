@@ -6,6 +6,9 @@ tqdm
 python-dotenv
 openai
 markdown
+python-docx
+reportlab
+weasyprint
 streamlit
 plotly
 textual
