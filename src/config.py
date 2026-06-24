@@ -27,6 +27,8 @@ METADATA_DIR = DATA_DIR / "metadata"
 ANALYTICS_DIR = DATA_DIR / "analytics"
 ANALYTICS_EXPORTS_DIR = ANALYTICS_DIR / "exports"
 REPORTS_DIR = DATA_DIR / "reports"
+BENCHMARKS_DIR = DATA_DIR / "benchmarks"
+BENCHMARK_RESULTS_DIR = BENCHMARKS_DIR / "results"
 
 RAW_COMPETITIONS_DIR = RAW_DIR / "competitions"
 RAW_MATCHES_DIR = RAW_DIR / "matches"
@@ -59,6 +61,8 @@ def ensure_directories() -> None:
         ANALYTICS_DIR,
         ANALYTICS_EXPORTS_DIR,
         REPORTS_DIR,
+        BENCHMARKS_DIR,
+        BENCHMARK_RESULTS_DIR,
     ):
         directory.mkdir(parents=True, exist_ok=True)
 

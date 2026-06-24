@@ -141,6 +141,13 @@ narrador-futbol/
    |  |- section_builder.py
    |  |- style_evaluator.py
    |  `- run_narrator_v2.py
+   |- benchmark/
+   |  |- benchmark_cases.py
+   |  |- benchmark_checks.py
+   |  |- narrative_regression.py
+   |  |- benchmark_runner.py
+   |  |- benchmark_report.py
+   |  `- run_benchmark.py
    |- reports/
    |  |- report_builder.py
    |  |- markdown_report.py
@@ -420,6 +427,47 @@ Las salidas guardadas usan sufijo de fecha/hora:
 
 Si `OPENAI_API_KEY` esta configurada y no usas `--no-api`, v2 usa el modelo de `OPENAI_MODEL`. Sin API, usa fallback local especializado para cada estilo.
 
+## Benchmark futbolístico y regresión narrativa
+
+La capa de benchmark valida que el sistema conserve consistencia factual, analítica y narrativa. Por default corre sin API para que funcione como prueba de regresión local.
+
+Caso inicial:
+
+- `germany_mexico_2018`: Germany 0-1 Mexico, FIFA World Cup 2018.
+
+Ejecutar todos los benchmarks:
+
+```bash
+uv run python -m src.benchmark.run_benchmark
+```
+
+Ejecutar un caso específico:
+
+```bash
+uv run python -m src.benchmark.run_benchmark --case germany_mexico_2018
+```
+
+Guardar resultado Markdown y JSON:
+
+```bash
+uv run python -m src.benchmark.run_benchmark --save
+```
+
+El benchmark revisa:
+
+- marcador y ganador esperados
+- dominio/xG esperado
+- jugadores relevantes
+- claims narrativos prohibidos
+- fact guard
+- calidad narrativa básica
+- comparación de Narrador AI v2
+
+Salidas:
+
+- `data/benchmarks/results/benchmark_YYYYMMDD_HHMMSS.json`
+- `data/benchmarks/results/benchmark_YYYYMMDD_HHMMSS.md`
+
 ## Evaluación del narrador
 
 La fase Narrador AI v1.1 agrega evaluación local de calidad narrativa sin depender de otro LLM.
@@ -550,7 +598,7 @@ La app incluye:
 - pagina principal con estado de `data/analytics/statsbomb.duckdb`
 - pagina de ingesta con resumen de `ingestion_log.duckdb`
 - pagina de partidos transformados con filtros basicos
-- pagina de analisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presion, posesion, momentum, analisis avanzado, Narrador AI con evaluacion/comparacion de tonos y reporte final, momentos clave y export JSON
+- pagina de analisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presion, posesion, momentum, analisis avanzado, Narrador AI con evaluacion/comparacion de tonos y reporte final, Narrador AI v2, Benchmark, momentos clave y export JSON
 
 Visualizaciones futbolisticas disponibles:
 

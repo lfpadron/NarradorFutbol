@@ -15,6 +15,9 @@ from src.analytics.possession_analysis import get_possession_summary
 from src.analytics.pressure_analysis import get_pressures
 from src.analytics.shot_analysis import get_shot_summary, get_shots
 from src.analytics.team_stats import get_team_stats
+from src.benchmark.benchmark_cases import BENCHMARK_CASES
+from src.benchmark.benchmark_report import save_benchmark_result
+from src.benchmark.benchmark_runner import run_all_benchmarks
 from src.config import ANALYTICS_EXPORTS_DIR
 from src.ingestion.utils import to_jsonable
 from src.narrative.config import SUPPORTED_TONES, has_openai_api_key
@@ -134,6 +137,7 @@ tabs = st.tabs(
         "Análisis avanzado",
         "Narrador AI",
         "Narrador AI v2",
+        "Benchmark",
         "Momentos clave",
         "Datos",
     ]
@@ -634,6 +638,91 @@ with tabs[7]:
         st.success(f"Mejor estilo sugerido: {v2_comparison.get('best_style')}")
 
 with tabs[8]:
+    st.subheader("Benchmark")
+    st.write("Validación futbolística y regresión narrativa para casos conocidos.")
+
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "case_id": case.get("case_id"),
+                    "match_id": case.get("match_id"),
+                    "label": case.get("label"),
+                    "winner": case.get("expected", {}).get("winner"),
+                    "dominant_team": case.get("expected", {}).get("dominant_team"),
+                }
+                for case in BENCHMARK_CASES
+            ]
+        ),
+        width="stretch",
+    )
+
+    benchmark_key = "benchmark_result_all_no_api"
+    benchmark_cols = st.columns(2)
+    if benchmark_cols[0].button("Ejecutar benchmark sin API"):
+        with st.spinner("Ejecutando benchmark y regresión narrativa..."):
+            try:
+                st.session_state[benchmark_key] = run_all_benchmarks(use_api=False)
+            except Exception as exc:
+                st.error(f"No se pudo ejecutar benchmark: {exc}")
+
+    benchmark_result = st.session_state.get(benchmark_key)
+    if benchmark_cols[1].button("Guardar resultado", disabled=benchmark_result is None):
+        if benchmark_result:
+            try:
+                paths = save_benchmark_result(benchmark_result)
+                st.success(f"Benchmark guardado: {paths['markdown']} | {paths['json']}")
+            except Exception as exc:
+                st.error(f"No se pudo guardar benchmark: {exc}")
+
+    if benchmark_result:
+        summary_result = benchmark_result.get("summary", {})
+        status_cols = st.columns(4)
+        status_cols[0].metric("Status", benchmark_result.get("status"))
+        status_cols[1].metric("PASS", summary_result.get("pass", 0))
+        status_cols[2].metric("WARNING", summary_result.get("warning", 0))
+        status_cols[3].metric("FAIL", summary_result.get("fail", 0))
+
+        case_rows = []
+        for case_result in benchmark_result.get("cases", []):
+            case_rows.append(
+                {
+                    "case_id": case_result.get("case_id"),
+                    "status": case_result.get("status"),
+                    "basic_quality": case_result.get("basic_narrative", {}).get("quality_overall_score"),
+                    "basic_fact_warnings": case_result.get("basic_narrative", {}).get("fact_warnings_count"),
+                    "v2_best_style": case_result.get("v2_narrative", {}).get("best_style"),
+                    "v2_fact_warnings": case_result.get("v2_narrative", {}).get("fact_warnings_count"),
+                }
+            )
+        st.dataframe(pd.DataFrame(case_rows), width="stretch")
+
+        for case_result in benchmark_result.get("cases", []):
+            with st.expander(f"{case_result.get('case_id')} | {case_result.get('status')}"):
+                checks_frame = pd.DataFrame(
+                    [
+                        {
+                            "check": check.get("check_name"),
+                            "status": check.get("status"),
+                            "message": check.get("message"),
+                        }
+                        for check in case_result.get("checks", [])
+                    ]
+                )
+                st.dataframe(checks_frame, width="stretch")
+                warnings = [
+                    check
+                    for check in case_result.get("checks", [])
+                    if check.get("status") != "PASS"
+                ]
+                if warnings:
+                    st.warning("Advertencias o fallos detectados")
+                    for warning in warnings:
+                        st.write(f"- {warning.get('check_name')}: {warning.get('message')}")
+                else:
+                    st.success("Todos los checks pasaron.")
+
+with tabs[9]:
     st.subheader("Momentos clave")
     st.write("Timeline simple con goles, ocasiones claras, tarjetas, penaltis, asistencias y cambios.")
     key_moments = detail["key_moments"]
@@ -656,7 +745,7 @@ with tabs[8]:
                     }
                 )
 
-with tabs[9]:
+with tabs[10]:
     st.subheader("Datos")
     st.write("Tablas de respaldo y export del contexto analítico para futuras fases.")
     data_tabs = st.tabs(
