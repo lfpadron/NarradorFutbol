@@ -40,6 +40,9 @@ data/analytics/exports/narrative_v2*.md
 data/reports/*
 !data/reports/.gitkeep
 
+data/comparisons/*
+!data/comparisons/.gitkeep
+
 data/benchmarks/results/*
 !data/benchmarks/.gitkeep
 !data/benchmarks/results/

@@ -9,7 +9,7 @@ BENCHMARK_CASES: list[dict[str, Any]] = [
     {
         "case_id": "germany_mexico_2018",
         "match_id": 7534,
-        "label": "Germany 0-1 Mexico, World Cup 2018",
+        "label": "Alemania 0-1 México, Copa Mundial 2018",
         "expected": {
             "home_team": "Germany",
             "away_team": "Mexico",
@@ -47,4 +47,3 @@ def get_benchmark_case(case_id: str) -> dict[str, Any]:
             return case
     supported = ", ".join(case["case_id"] for case in BENCHMARK_CASES)
     raise ValueError(f"Unsupported benchmark case '{case_id}'. Supported cases: {supported}")
-

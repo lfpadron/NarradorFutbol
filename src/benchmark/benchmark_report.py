@@ -12,7 +12,7 @@ from src.ingestion.utils import to_jsonable
 
 def render_benchmark_markdown(result: dict[str, Any]) -> str:
     lines = [
-        "# Benchmark del Narrador Inteligente de Futbol",
+        "# Benchmark del Narrador Inteligente de Fútbol",
         "",
         "## Resumen",
         "",
@@ -112,4 +112,3 @@ def _conclusion(result: dict[str, Any]) -> str:
     if result.get("status") == "WARNING":
         return "El benchmark es utilizable, pero dejó advertencias que conviene revisar antes de una demo."
     return "El benchmark detectó fallos que deben corregirse antes de usar el sistema como referencia."
-

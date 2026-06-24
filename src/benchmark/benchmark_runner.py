@@ -39,6 +39,7 @@ def run_benchmark_case(case: dict[str, Any], use_api: bool = False) -> dict[str,
         {
             "case_id": case["case_id"],
             "match_id": match_id,
+            "mode": "curated_benchmark",
             "label": case["label"],
             "status": _overall_status(checks),
             "checks": checks,
@@ -55,6 +56,7 @@ def run_all_benchmarks(use_api: bool = False) -> dict[str, Any]:
         {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "use_api": use_api,
+            "mode": "curated_benchmark",
             "status": _overall_status_from_cases(cases),
             "cases": cases,
             "summary": _summary(cases),
@@ -69,6 +71,7 @@ def run_selected_benchmark(case_id: str, use_api: bool = False) -> dict[str, Any
         {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "use_api": use_api,
+            "mode": "curated_benchmark",
             "status": result["status"],
             "cases": [result],
             "summary": _summary([result]),
@@ -165,4 +168,3 @@ def _summary(cases: list[dict[str, Any]]) -> dict[str, int]:
         "warning": sum(1 for case in cases if case["status"] == "WARNING"),
         "fail": sum(1 for case in cases if case["status"] == "FAIL"),
     }
-

@@ -1,27 +1,29 @@
-# Narrador Inteligente de Futbol
+# Narrador Inteligente de Fútbol
 
-Base de ingesta para construir un narrador inteligente de futbol usando datos abiertos de StatsBomb.
+Base de ingesta para construir un narrador inteligente de fútbol usando datos abiertos de StatsBomb.
 
 El proyecto ya cubre las primeras capas del sistema:
 
 - descarga de datos StatsBomb Open Data
-- guardado raw en JSON, sin transformaciones analiticas
-- indice maestro de partidos
-- bitacora persistente de ingesta en DuckDB
-- transformacion analitica a DuckDB
-- metricas futbolisticas
-- interfaz Streamlit basica
+- guardado raw en JSON, sin transformaciones analíticas
+- índice maestro de partidos
+- bitácora persistente de ingesta en DuckDB
+- transformación analítica a DuckDB
+- métricas futbolísticas
+- interfaz Streamlit básica
 - TUI local de control
 - Narrador AI v1 con fallback local sin credenciales
 - Narrador AI v2 con estilos especializados por audiencia
 - reportes finales en Markdown, HTML y JSON
 - exportadores profesionales en PDF y DOCX
+- comparador de partidos con narrativa comparativa
+- comparador de jugadores para preparar Scouting AI
 
 La app conserva los datos raw sin modificaciones y genera los entregables derivados en `data/`.
 
-## Instalacion
+## Instalación
 
-El proyecto usa `uv` como manejador de dependencias y ejecucion.
+El proyecto usa `uv` como manejador de dependencias y ejecución.
 
 ```bash
 uv sync
@@ -37,7 +39,7 @@ Descargar todo:
 uv run python -m src.ingestion.run_ingestion
 ```
 
-Limitar partidos para una prueba rapida:
+Limitar partidos para una prueba rápida:
 
 ```bash
 uv run python -m src.ingestion.run_ingestion --limit 5
@@ -49,13 +51,13 @@ Forzar redescarga de archivos existentes:
 uv run python -m src.ingestion.run_ingestion --force
 ```
 
-Reintentar solo partidos con algun estado `failed` en la bitacora:
+Reintentar solo partidos con algún estado `failed` en la bitácora:
 
 ```bash
 uv run python -m src.ingestion.run_ingestion --retry-failed
 ```
 
-Descargar eventos, alineaciones y 360 de un partido especifico:
+Descargar eventos, alineaciones y 360 de un partido específico:
 
 ```bash
 uv run python -m src.ingestion.run_ingestion --match-id 7534
@@ -86,7 +88,8 @@ narrador-futbol/
 |  |  |- lineups/
 |  |  `- three-sixty/
 |  |- metadata/
-|  `- reports/
+|  |- reports/
+|  `- comparisons/
 `- src/
    |- config.py
    |- ingestion/
@@ -144,10 +147,22 @@ narrador-futbol/
    |- benchmark/
    |  |- benchmark_cases.py
    |  |- benchmark_checks.py
+   |  |- generic_validation.py
+   |  |- generic_narrative_checks.py
+   |  |- generic_report.py
    |  |- narrative_regression.py
    |  |- benchmark_runner.py
    |  |- benchmark_report.py
    |  `- run_benchmark.py
+   |- comparison/
+   |  |- match_comparison.py
+   |  |- comparison_narrative.py
+   |  |- comparison_report.py
+   |  |- run_match_comparison.py
+   |  |- player_comparison.py
+   |  |- player_comparison_narrative.py
+   |  |- player_comparison_report.py
+   |  `- run_player_comparison.py
    |- reports/
    |  |- report_builder.py
    |  |- markdown_report.py
@@ -167,7 +182,7 @@ narrador-futbol/
 
 ## Raw JSON
 
-Los archivos en `data/raw/` son copias de las respuestas de StatsBomb guardadas como JSON. La idea es conservar una capa raw reproducible antes de cualquier transformacion.
+Los archivos en `data/raw/` son copias de las respuestas de StatsBomb guardadas como JSON. La idea es conservar una capa raw reproducible antes de cualquier transformación.
 
 Rutas principales:
 
@@ -177,20 +192,20 @@ Rutas principales:
 - `data/raw/lineups/lineups.match-{match_id}.json`
 - `data/raw/three-sixty/three-sixty.match-{match_id}.json`
 
-## Indice maestro y bitacora
+## Índice maestro y bitácora
 
-Cada corrida reconstruye el indice maestro de partidos desde los JSON de matches:
+Cada corrida reconstruye el índice maestro de partidos desde los JSON de matches:
 
 - `data/metadata/all_matches.csv`
 - `data/metadata/all_matches.parquet`
 
-La bitacora persistente vive en:
+La bitácora persistente vive en:
 
 - `data/metadata/ingestion_log.duckdb`
 
 Tabla: `ingestion_log`
 
-Estados validos:
+Estados válidos:
 
 - `pending`
 - `downloaded`
@@ -201,7 +216,7 @@ Estados validos:
 
 El proceso es reejecutable. Si un archivo ya existe y no usas `--force`, no se descarga otra vez y se registra `skipped_existing`.
 
-## Transformacion analitica
+## Transformación analítica
 
 La Fase 2 transforma los JSON raw descargados a una base DuckDB local:
 
@@ -219,7 +234,7 @@ Prueba limitada:
 uv run python -m src.transform.build_duckdb --limit 3 --force
 ```
 
-Transformar un partido especifico:
+Transformar un partido específico:
 
 ```bash
 uv run python -m src.transform.build_duckdb --match-id 7298 --force
@@ -272,8 +287,8 @@ SELECT COUNT(*) FROM shot;
 
 ## Capa analytics
 
-La Fase 3 calcula metricas futbolisticas sobre `data/analytics/statsbomb.duckdb`.
-No modifica raw JSON ni reconstruye la base; solo lee tablas y vistas analiticas.
+La Fase 3 calcula métricas futbolísticas sobre `data/analytics/statsbomb.duckdb`.
+No modifica raw JSON ni reconstruye la base; solo lee tablas y vistas analíticas.
 
 Listar partidos transformados:
 
@@ -287,7 +302,7 @@ Analizar un partido:
 uv run python -m src.analytics.run_analysis --match-id 3754078
 ```
 
-Exportar contexto analitico JSON:
+Exportar contexto analítico JSON:
 
 ```bash
 uv run python -m src.analytics.run_analysis --match-id 3754078 --export-json
@@ -316,20 +331,20 @@ La salida incluye:
 - `validation`
 - `reference_comparison`
 
-## Validacion futbolistica avanzada
+## Validación futbolística avanzada
 
-La fase actual agrega una capa de enriquecimiento y validacion sobre el partido transformado.
-Estas metricas no modifican datos raw ni escriben tablas analiticas nuevas; se calculan leyendo DuckDB.
+La fase actual agrega una capa de enriquecimiento y validación sobre el partido transformado.
+Estas métricas no modifican datos raw ni escriben tablas analíticas nuevas; se calculan leyendo DuckDB.
 
-Metricas principales:
+Métricas principales:
 
-- dominio por equipo: tiros, xG, entradas al ultimo tercio, pases progresivos y score de dominio
+- dominio por equipo: tiros, xG, entradas al último tercio, pases progresivos y score de dominio
 - intervalos de dominio cada 5 minutos
-- ataques peligrosos por posesion
+- ataques peligrosos por posesión
 - desglose de xG por equipo
 - jugadores de impacto
-- validacion automatica de anomalias basicas
-- comparacion contra el partido referencia Mexico vs Alemania 2018 (`match_id=7534`)
+- validación automática de anomalías básicas
+- comparación contra el partido referencia México vs Alemania 2018 (`match_id=7534`)
 
 Ejemplo recomendado:
 
@@ -337,12 +352,12 @@ Ejemplo recomendado:
 uv run python -m src.analytics.run_analysis --match-id 7534 --export-json
 ```
 
-El JSON exportado `data/analytics/exports/analysis.match-7534.json` incluye los bloques avanzados para futuras fases de curaduria y narracion.
+El JSON exportado `data/analytics/exports/analysis.match-7534.json` incluye los bloques avanzados para futuras fases de curaduría y narración.
 
 ## Narrador AI
 
-La fase Narrador AI v1 genera una narracion en Markdown desde el contexto curado de `src/analytics/ai_context.py`.
-La IA no lee todos los eventos crudos; recibe resumen del partido, metricas, dominio, ataques peligrosos, momentos clave, jugadores de impacto y validacion.
+La fase Narrador AI v1 genera una narración en Markdown desde el contexto curado de `src/analytics/ai_context.py`.
+La IA no lee todos los eventos crudos; recibe resumen del partido, métricas, dominio, ataques peligrosos, momentos clave, jugadores de impacto y validación.
 
 Variables opcionales en `.env`:
 
@@ -388,7 +403,7 @@ El `fact_guard` agrega advertencias simples si detecta posibles contradicciones 
 
 ## Narrador AI v2
 
-Narrador AI v2 no reemplaza al narrador basico. Vive en `src/narrative_v2/` y genera narrativas especializadas por audiencia:
+Narrador AI v2 no reemplaza al narrador básico. Vive en `src/narrative_v2/` y genera narrativas especializadas por audiencia:
 
 - `tactico`
 - `television`
@@ -425,15 +440,20 @@ Las salidas guardadas usan sufijo de fecha/hora:
 - `data/analytics/exports/narrative_v2.match-7534.tactico_YYYYMMDD_HHMMSS.md`
 - `data/analytics/exports/narrative_v2.match-7534.tactico_YYYYMMDD_HHMMSS.json`
 
-Si `OPENAI_API_KEY` esta configurada y no usas `--no-api`, v2 usa el modelo de `OPENAI_MODEL`. Sin API, usa fallback local especializado para cada estilo.
+Si `OPENAI_API_KEY` está configurada y no usas `--no-api`, v2 usa el modelo de `OPENAI_MODEL`. Sin API, usa fallback local especializado para cada estilo.
 
-## Benchmark futbolístico y regresión narrativa
+## Benchmark futbolístico y validación genérica
 
 La capa de benchmark valida que el sistema conserve consistencia factual, analítica y narrativa. Por default corre sin API para que funcione como prueba de regresión local.
 
+Hay dos modos separados:
+
+- **Benchmark curado:** compara contra expectativas humanas conocidas. Es ideal para regresión narrativa y demos controladas.
+- **Validación genérica:** funciona con cualquier `match_id` ya transformado. No intenta probar verdad histórica externa; revisa consistencia interna, datos analíticos, generación de reportes y narrativas.
+
 Caso inicial:
 
-- `germany_mexico_2018`: Germany 0-1 Mexico, FIFA World Cup 2018.
+- `germany_mexico_2018`: Alemania 0-1 México, Copa Mundial 2018.
 
 Ejecutar todos los benchmarks:
 
@@ -447,13 +467,25 @@ Ejecutar un caso específico:
 uv run python -m src.benchmark.run_benchmark --case germany_mexico_2018
 ```
 
-Guardar resultado Markdown y JSON:
+Guardar resultado curado en Markdown y JSON:
 
 ```bash
 uv run python -m src.benchmark.run_benchmark --save
 ```
 
-El benchmark revisa:
+Validar cualquier partido transformado:
+
+```bash
+uv run python -m src.benchmark.run_benchmark --match-id 7534 --generic
+```
+
+Validar y guardar resultado genérico:
+
+```bash
+uv run python -m src.benchmark.run_benchmark --match-id 7534 --generic --save
+```
+
+El benchmark curado revisa:
 
 - marcador y ganador esperados
 - dominio/xG esperado
@@ -463,10 +495,103 @@ El benchmark revisa:
 - calidad narrativa básica
 - comparación de Narrador AI v2
 
-Salidas:
+La validación genérica revisa:
+
+- existencia del partido en DuckDB analítico
+- eventos, equipos y marcador
+- goles detectados contra marcador
+- xG, tiros, coordenadas y jugadores
+- dominio del partido
+- generación de reporte final en memoria
+- narrativa básica y Narrador AI v2
+
+Salidas del benchmark curado:
 
 - `data/benchmarks/results/benchmark_YYYYMMDD_HHMMSS.json`
 - `data/benchmarks/results/benchmark_YYYYMMDD_HHMMSS.md`
+
+Salidas de la validación genérica:
+
+- `data/benchmarks/results/generic_validation.match-7534_YYYYMMDD_HHMMSS.json`
+- `data/benchmarks/results/generic_validation.match-7534_YYYYMMDD_HHMMSS.md`
+
+## Comparador de partidos
+
+El comparador permite revisar dos partidos transformados lado a lado. Calcula diferencias de tiros, xG, goles, pases, posesión, dominio, momentum, ataques peligrosos, jugadores de impacto, momentos clave e intensidad.
+
+Comparar dos partidos:
+
+```bash
+uv run python -m src.comparison.run_match_comparison --match-a 7534 --match-b 3754078
+```
+
+Generar narrativa comparativa local:
+
+```bash
+uv run python -m src.comparison.run_match_comparison --match-a 7534 --match-b 3754078 --narrative --no-api
+```
+
+Guardar comparación y narrativa:
+
+```bash
+uv run python -m src.comparison.run_match_comparison --match-a 7534 --match-b 3754078 --save --narrative --no-api
+```
+
+Salidas:
+
+- `data/comparisons/comparison.match-7534_vs_3754078_YYYYMMDD_HHMMSS.json`
+- `data/comparisons/comparison.match-7534_vs_3754078_YYYYMMDD_HHMMSS.md`
+
+La pestaña **Comparador de partidos** en Streamlit permite elegir Partido A y Partido B, comparar métricas, revisar dominio e impacto, generar narrativa comparativa y guardar el resultado.
+
+## Comparador de jugadores
+
+El comparador de jugadores permite contrastar dos futbolistas dentro de un mismo partido o entre partidos distintos. Distingue volumen, eficiencia e impacto, y advierte cuando los roles son distintos para evitar lecturas absolutas.
+
+La interfaz visual incluye:
+
+- radar comparativo normalizado 0-100
+- barras comparativas
+- perfiles ofensivo, creación, pase, defensivo e impacto
+- fortalezas y debilidades por jugador
+
+Listar jugadores disponibles:
+
+```bash
+uv run python -m src.comparison.run_player_comparison --list-players --match-id 7534
+```
+
+Comparar dos jugadores:
+
+```bash
+uv run python -m src.comparison.run_player_comparison --match-a 7534 --player-a <PLAYER_ID_A> --match-b 7534 --player-b <PLAYER_ID_B>
+```
+
+Generar narrativa comparativa local:
+
+```bash
+uv run python -m src.comparison.run_player_comparison --match-a 7534 --player-a <PLAYER_ID_A> --match-b 7534 --player-b <PLAYER_ID_B> --narrative --no-api
+```
+
+Guardar comparación y narrativa:
+
+```bash
+uv run python -m src.comparison.run_player_comparison --match-a 7534 --player-a <PLAYER_ID_A> --match-b 7534 --player-b <PLAYER_ID_B> --save --narrative --no-api
+```
+
+Exportar datos visuales para radar y fortalezas:
+
+```bash
+uv run python -m src.comparison.run_player_comparison --match-a 7534 --player-a 5571 --match-b 7534 --player-b 5579 --export-visual-data
+```
+
+Salidas:
+
+- `data/comparisons/player_comparison.match-7534.<PLAYER_ID_A>_vs_match-7534.<PLAYER_ID_B>_YYYYMMDD_HHMMSS.json`
+- `data/comparisons/player_comparison.match-7534.<PLAYER_ID_A>_vs_match-7534.<PLAYER_ID_B>_YYYYMMDD_HHMMSS.md`
+- `data/comparisons/player_visual_data.match-7534.5571_vs_match-7534.5579_YYYYMMDD_HHMMSS.json`
+
+La pestaña **Comparador de jugadores** en Streamlit permite seleccionar Partido A, Jugador A, Partido B y Jugador B, revisar radar, barras, métricas ofensivas, creación, defensa, impacto, fortalezas/debilidades y generar una narrativa comparativa.
 
 ## Evaluación del narrador
 
@@ -570,15 +695,15 @@ Salidas adicionales:
 - `data/reports/report.match-7534.cronica_emocionante_YYYYMMDD_HHMMSS.docx`
 - `data/analytics/report_history.duckdb`
 
-Todos los formatos generados en una misma exportacion comparten el mismo sufijo `_YYYYMMDD_HHMMSS`, por ejemplo `report.match-7534.cronica_emocionante_20260622_233028.html`.
+Todos los formatos generados en una misma exportación comparten el mismo sufijo `_YYYYMMDD_HHMMSS`, por ejemplo `report.match-7534.cronica_emocionante_20260622_233028.html`.
 
-El PDF intenta usar WeasyPrint primero. En Windows, si faltan librerias nativas como `libgobject`, usa un fallback con ReportLab para generar el archivo de todos modos. Si ambos motores fallan, el flujo no se rompe: se guardan Markdown/HTML/JSON/DOCX, se registra `pdf_status=failed` y el error queda en el historial.
+El PDF intenta usar WeasyPrint primero. En Windows, si faltan librerías nativas como `libgobject`, usa un fallback con ReportLab para generar el archivo de todos modos. Si ambos motores fallan, el flujo no se rompe: se guardan Markdown/HTML/JSON/DOCX, se registra `pdf_status=failed` y el error queda en el historial.
 
 El DOCX usa `python-docx` y debe funcionar localmente sin credenciales. El campo `generated_by` del historial usa `NARRADOR_USER_EMAIL`; si no existe, usa `local_user`.
 
 ## Ejecutar interfaz Streamlit
 
-La Fase 4 agrega una interfaz local para revisar el estado del pipeline, listar partidos transformados y explorar el analisis de un partido.
+La Fase 4 agrega una interfaz local para revisar el estado del pipeline, listar partidos transformados y explorar el análisis de un partido.
 
 ```bash
 uv run streamlit run app/streamlit_app.py
@@ -595,12 +720,12 @@ uv run streamlit run app/streamlit_app.py
 
 La app incluye:
 
-- pagina principal con estado de `data/analytics/statsbomb.duckdb`
-- pagina de ingesta con resumen de `ingestion_log.duckdb`
-- pagina de partidos transformados con filtros basicos
-- pagina de analisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presion, posesion, momentum, analisis avanzado, Narrador AI con evaluacion/comparacion de tonos y reporte final, Narrador AI v2, Benchmark, momentos clave y export JSON
+- página principal con estado de `data/analytics/statsbomb.duckdb`
+- página de ingesta con resumen de `ingestion_log.duckdb`
+- página de partidos transformados con filtros básicos
+- página de análisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presión, posesión, momentum, análisis avanzado, Narrador AI con evaluación/comparación de tonos y reporte final, Narrador AI v2, Benchmark, Comparador de partidos, Comparador de jugadores, momentos clave y export JSON
 
-Visualizaciones futbolisticas disponibles:
+Visualizaciones futbolísticas disponibles:
 
 - mapa de tiros en cancha StatsBomb 120x80
 - xG acumulado por equipo
@@ -609,7 +734,7 @@ Visualizaciones futbolisticas disponibles:
 - red simple de pases por equipo
 - momentum por intervalos con tooltip
 - panel/timeline de momentos clave
-- tablas de dominio, xG, ataques peligrosos, jugadores de impacto y validacion
+- tablas de dominio, xG, ataques peligrosos, jugadores de impacto y validación
 
 Dependencias visuales principales:
 
@@ -634,7 +759,7 @@ La TUI permite controlar Streamlit desde terminal:
 - apagar Streamlit
 - ver logs del proceso
 
-Desde la raiz del proyecto:
+Desde la raíz del proyecto:
 
 ```bash
 control_tui.bat

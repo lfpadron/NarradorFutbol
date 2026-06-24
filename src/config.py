@@ -27,6 +27,7 @@ METADATA_DIR = DATA_DIR / "metadata"
 ANALYTICS_DIR = DATA_DIR / "analytics"
 ANALYTICS_EXPORTS_DIR = ANALYTICS_DIR / "exports"
 REPORTS_DIR = DATA_DIR / "reports"
+COMPARISONS_DIR = DATA_DIR / "comparisons"
 BENCHMARKS_DIR = DATA_DIR / "benchmarks"
 BENCHMARK_RESULTS_DIR = BENCHMARKS_DIR / "results"
 
@@ -61,6 +62,7 @@ def ensure_directories() -> None:
         ANALYTICS_DIR,
         ANALYTICS_EXPORTS_DIR,
         REPORTS_DIR,
+        COMPARISONS_DIR,
         BENCHMARKS_DIR,
         BENCHMARK_RESULTS_DIR,
     ):

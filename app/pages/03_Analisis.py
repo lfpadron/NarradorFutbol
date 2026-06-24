@@ -18,6 +18,20 @@ from src.analytics.team_stats import get_team_stats
 from src.benchmark.benchmark_cases import BENCHMARK_CASES
 from src.benchmark.benchmark_report import save_benchmark_result
 from src.benchmark.benchmark_runner import run_all_benchmarks
+from src.benchmark.generic_report import save_generic_validation_result
+from src.benchmark.generic_validation import validate_any_match
+from src.comparison.comparison_narrative import generate_match_comparison_narrative
+from src.comparison.comparison_report import save_match_comparison
+from src.comparison.match_comparison import compare_matches
+from src.comparison.player_comparison import build_player_radar_metrics, compare_players, list_players_for_match
+from src.comparison.player_comparison_narrative import generate_player_comparison_narrative
+from src.comparison.player_comparison_report import save_player_comparison
+from src.comparison.player_visuals import (
+    plot_player_metric_bars,
+    plot_player_profile_groups,
+    plot_player_radar,
+    plot_player_strengths_weaknesses,
+)
 from src.config import ANALYTICS_EXPORTS_DIR
 from src.ingestion.utils import to_jsonable
 from src.narrative.config import SUPPORTED_TONES, has_openai_api_key
@@ -48,8 +62,8 @@ from src.ui.pitch_charts import (
 )
 
 
-st.set_page_config(page_title="Analisis", layout="wide")
-st.title("Analisis")
+st.set_page_config(page_title="Análisis", layout="wide")
+st.title("Análisis")
 
 
 @st.cache_data(show_spinner=False)
@@ -88,6 +102,11 @@ def load_detail(match_id: int) -> dict[str, object]:
 @st.cache_data(show_spinner=False)
 def load_pass_network(match_id: int, team_name: str) -> dict[str, object]:
     return get_pass_network(match_id, team_name)
+
+
+@st.cache_data(show_spinner=False)
+def load_players_for_match(match_id: int) -> list[dict[str, object]]:
+    return list_players_for_match(match_id)
 
 
 def team_options(team_stats: list[dict[str, object]]) -> list[str]:
@@ -138,6 +157,8 @@ tabs = st.tabs(
         "Narrador AI",
         "Narrador AI v2",
         "Benchmark",
+        "Comparador de partidos",
+        "Comparador de jugadores",
         "Momentos clave",
         "Datos",
     ]
@@ -515,7 +536,7 @@ with tabs[6]:
                 optional_paths = True
                 st.write(f"- {format_labels[label]}: {path}")
         if not optional_paths:
-            st.caption("No se genero ningun formato adicional en esta corrida.")
+            st.caption("No se generó ningún formato adicional en esta corrida.")
 
         audit_cols = st.columns(3)
         audit_cols[0].metric("Generado por", report_paths.get("generated_by", "local_user"))
@@ -639,7 +660,10 @@ with tabs[7]:
 
 with tabs[8]:
     st.subheader("Benchmark")
-    st.write("Validación futbolística y regresión narrativa para casos conocidos.")
+    st.write("Validación futbolística y regresión narrativa, con rutas separadas para casos curados y partidos genéricos.")
+
+    st.markdown("### Benchmark curado")
+    st.caption("Usa expectativas humanas conocidas; sirve para regresión narrativa y demos históricas controladas.")
 
     st.dataframe(
         pd.DataFrame(
@@ -722,7 +746,492 @@ with tabs[8]:
                 else:
                     st.success("Todos los checks pasaron.")
 
+    st.divider()
+    st.markdown("### Validación genérica")
+    st.caption(
+        "Funciona con cualquier partido transformado. Revisa consistencia interna, datos analíticos, reportes y narrativas sin exigir expectativas históricas."
+    )
+
+    generic_match_id = st.number_input(
+        "Match ID para validación genérica",
+        min_value=1,
+        value=int(match_id),
+        step=1,
+    )
+    generic_key = f"generic_validation_{int(generic_match_id)}"
+    generic_cols = st.columns(2)
+    if generic_cols[0].button("Validar partido"):
+        with st.spinner("Ejecutando validación genérica..."):
+            try:
+                st.session_state[generic_key] = validate_any_match(int(generic_match_id), use_api=False)
+            except Exception as exc:
+                st.error(f"No se pudo ejecutar la validación genérica: {exc}")
+
+    generic_result = st.session_state.get(generic_key)
+    if generic_cols[1].button("Guardar validación", disabled=generic_result is None):
+        if generic_result:
+            try:
+                paths = save_generic_validation_result(generic_result)
+                st.success(f"Validación guardada: {paths['markdown']} | {paths['json']}")
+            except Exception as exc:
+                st.error(f"No se pudo guardar la validación genérica: {exc}")
+
+    if generic_result:
+        generic_summary = generic_result.get("summary", {})
+        generic_checks = generic_result.get("checks", [])
+        generic_status_cols = st.columns(5)
+        generic_status_cols[0].metric("Status", generic_result.get("status"))
+        generic_status_cols[1].metric("PASS", sum(1 for row in generic_checks if row.get("status") == "PASS"))
+        generic_status_cols[2].metric("WARNING", sum(1 for row in generic_checks if row.get("status") == "WARNING"))
+        generic_status_cols[3].metric("FAIL", sum(1 for row in generic_checks if row.get("status") == "FAIL"))
+        generic_status_cols[4].metric("Eventos", generic_summary.get("events", 0))
+
+        st.write(
+            f"{generic_summary.get('home_team')} {generic_summary.get('home_score')}-"
+            f"{generic_summary.get('away_score')} {generic_summary.get('away_team')}"
+        )
+        generic_rows = [
+            {
+                "check": check.get("check_name"),
+                "status": check.get("status"),
+                "message": check.get("message"),
+            }
+            for check in generic_checks
+        ]
+        st.dataframe(pd.DataFrame(generic_rows), width="stretch")
+
+        generic_warnings = generic_result.get("warnings", [])
+        if generic_warnings:
+            st.warning("Advertencias o fallos detectados")
+            for warning in generic_warnings:
+                st.write(f"- {warning}")
+        else:
+            st.success("La validación genérica no generó advertencias.")
+
+        basic_generic = generic_result.get("narrative_basic", {})
+        v2_generic = generic_result.get("narrative_v2", {})
+        narrative_cols = st.columns(4)
+        narrative_cols[0].metric("Narrativa básica", basic_generic.get("status", "N/D"))
+        narrative_cols[1].metric(
+            "Calidad básica",
+            basic_generic.get("quality", {}).get("overall_score", "N/D"),
+        )
+        narrative_cols[2].metric("Estilos v2", v2_generic.get("styles_checked", 0))
+        narrative_cols[3].metric("Warnings v2", v2_generic.get("fact_warnings_total", 0))
+
 with tabs[9]:
+    st.subheader("Comparador de partidos")
+    st.write("Compara dos partidos transformados para revisar diferencias de volumen, eficacia, dominio e impacto.")
+
+    match_labels = list(options.keys())
+    default_a_index = next((idx for idx, label in enumerate(match_labels) if options[label] == 7534), 0)
+    default_b_index = next(
+        (
+            idx
+            for idx, label in enumerate(match_labels)
+            if options[label] != options[match_labels[default_a_index]]
+        ),
+        0,
+    )
+    selector_cols = st.columns(2)
+    comparison_label_a = selector_cols[0].selectbox(
+        "Partido A",
+        match_labels,
+        index=default_a_index,
+        key="comparison_match_a",
+    )
+    comparison_label_b = selector_cols[1].selectbox(
+        "Partido B",
+        match_labels,
+        index=default_b_index,
+        key="comparison_match_b",
+    )
+    comparison_match_a = options[comparison_label_a]
+    comparison_match_b = options[comparison_label_b]
+    comparison_key = f"comparison_{comparison_match_a}_{comparison_match_b}"
+    comparison_narrative_key = f"comparison_narrative_{comparison_match_a}_{comparison_match_b}"
+
+    comparison_actions = st.columns(3)
+    if comparison_actions[0].button("Comparar partidos"):
+        with st.spinner("Comparando partidos..."):
+            try:
+                st.session_state[comparison_key] = compare_matches(comparison_match_a, comparison_match_b)
+                st.session_state.pop(comparison_narrative_key, None)
+            except Exception as exc:
+                st.error(f"No se pudo comparar partidos: {exc}")
+
+    current_comparison = st.session_state.get(comparison_key)
+    if comparison_actions[1].button(
+        "Generar narrativa comparativa",
+        disabled=current_comparison is None,
+        key="match_comparison_generate_narrative",
+    ):
+        with st.spinner("Generando narrativa comparativa..."):
+            try:
+                st.session_state[comparison_narrative_key] = generate_match_comparison_narrative(
+                    comparison_match_a,
+                    comparison_match_b,
+                    use_api=False,
+                )
+            except Exception as exc:
+                st.error(f"No se pudo generar narrativa comparativa: {exc}")
+
+    current_narrative = st.session_state.get(comparison_narrative_key)
+    if comparison_actions[2].button(
+        "Guardar comparación",
+        disabled=current_comparison is None,
+        key="match_comparison_save",
+    ):
+        if current_comparison:
+            try:
+                paths = save_match_comparison(current_comparison, current_narrative)
+                st.success(f"Comparación guardada: {paths['markdown']} | {paths['json']}")
+            except Exception as exc:
+                st.error(f"No se pudo guardar la comparación: {exc}")
+
+    if current_comparison:
+        match_a = current_comparison.get("match_a", {})
+        match_b = current_comparison.get("match_b", {})
+        summary_comparison = current_comparison.get("summary_comparison", {})
+        summary_cols = st.columns(2)
+        with summary_cols[0]:
+            st.markdown("### Partido A")
+            a_metric_cols = st.columns(4)
+            st.write(match_a.get("scoreline"))
+            a_metric_cols[0].metric("Tiros", match_a.get("total_shots"))
+            a_metric_cols[1].metric("xG", format_float(match_a.get("total_xg")))
+            a_metric_cols[2].metric("Pases", match_a.get("total_passes"))
+            a_metric_cols[3].metric("Ataques peligrosos", match_a.get("dangerous_attacks"))
+        with summary_cols[1]:
+            st.markdown("### Partido B")
+            b_metric_cols = st.columns(4)
+            st.write(match_b.get("scoreline"))
+            b_metric_cols[0].metric("Tiros", match_b.get("total_shots"))
+            b_metric_cols[1].metric("xG", format_float(match_b.get("total_xg")))
+            b_metric_cols[2].metric("Pases", match_b.get("total_passes"))
+            b_metric_cols[3].metric("Ataques peligrosos", match_b.get("dangerous_attacks"))
+
+        difference_rows = []
+        for label, key in (
+            ("Goles", "goal_difference"),
+            ("Tiros", "shot_difference"),
+            ("xG", "xg_difference"),
+            ("Pases", "pass_difference"),
+            ("Ataques peligrosos", "dangerous_attack_difference"),
+        ):
+            values = summary_comparison.get(key, {})
+            difference_rows.append(
+                {
+                    "métrica": label,
+                    "partido_a": values.get("match_a"),
+                    "partido_b": values.get("match_b"),
+                    "diferencia_b_menos_a": values.get("difference_b_minus_a"),
+                    "mayor": values.get("higher_match"),
+                }
+            )
+        st.markdown("### Diferencias")
+        st.dataframe(pd.DataFrame(difference_rows), width="stretch")
+
+        pass_success = current_comparison.get("pass_comparison", {}).get("successful_passes", {})
+        possessions_total = current_comparison.get("possession_comparison", {}).get("total_possessions", {})
+        key_moments_total = current_comparison.get("key_moments_comparison", {}).get("total_key_moments", {})
+        side_by_side_rows = [
+            {
+                "métrica": "Intensidad",
+                "partido_a": summary_comparison.get("intensity_a", {}).get("score"),
+                "partido_b": summary_comparison.get("intensity_b", {}).get("score"),
+                "diferencia_b_menos_a": None,
+                "mayor": summary_comparison.get("more_intense_match"),
+            },
+            {
+                "métrica": "Pases completados",
+                "partido_a": pass_success.get("match_a"),
+                "partido_b": pass_success.get("match_b"),
+                "diferencia_b_menos_a": pass_success.get("difference_b_minus_a"),
+                "mayor": pass_success.get("higher_match"),
+            },
+            {
+                "métrica": "Posesiones",
+                "partido_a": possessions_total.get("match_a"),
+                "partido_b": possessions_total.get("match_b"),
+                "diferencia_b_menos_a": possessions_total.get("difference_b_minus_a"),
+                "mayor": possessions_total.get("higher_match"),
+            },
+            {
+                "métrica": "Momentos clave",
+                "partido_a": key_moments_total.get("match_a"),
+                "partido_b": key_moments_total.get("match_b"),
+                "diferencia_b_menos_a": key_moments_total.get("difference_b_minus_a"),
+                "mayor": key_moments_total.get("higher_match"),
+            },
+        ]
+        st.markdown("### xG, tiros, pases y posesión")
+        st.dataframe(pd.DataFrame(side_by_side_rows), width="stretch")
+
+        dominance_comparison = current_comparison.get("dominance_comparison", {})
+        dominance_rows = [
+            {"partido": "A", **dominance_comparison.get("leader_a", {})},
+            {"partido": "B", **dominance_comparison.get("leader_b", {})},
+        ]
+        st.markdown("### Dominio comparado")
+        st.dataframe(pd.DataFrame(dominance_rows), width="stretch")
+
+        impact_comparison = current_comparison.get("impact_players_comparison", {})
+        impact_cols = st.columns(2)
+        with impact_cols[0]:
+            st.markdown("### Impacto Partido A")
+            st.dataframe(pd.DataFrame(impact_comparison.get("rows_a", [])), width="stretch")
+        with impact_cols[1]:
+            st.markdown("### Impacto Partido B")
+            st.dataframe(pd.DataFrame(impact_comparison.get("rows_b", [])), width="stretch")
+
+        key_moments_comparison = current_comparison.get("key_moments_comparison", {})
+        moments_cols = st.columns(2)
+        with moments_cols[0]:
+            st.markdown("### Momentos Partido A")
+            st.dataframe(pd.DataFrame(key_moments_comparison.get("rows_a", [])), width="stretch")
+        with moments_cols[1]:
+            st.markdown("### Momentos Partido B")
+            st.dataframe(pd.DataFrame(key_moments_comparison.get("rows_b", [])), width="stretch")
+
+        comparison_warnings = current_comparison.get("warnings", [])
+        if comparison_warnings:
+            st.warning("Advertencias de comparación")
+            for warning in comparison_warnings:
+                st.write(f"- {warning}")
+
+    if current_narrative:
+        narrative_warnings = current_narrative.get("warnings", [])
+        if narrative_warnings:
+            st.info("Narrativa generada con avisos.")
+            for warning in narrative_warnings:
+                st.write(f"- {warning}")
+        st.markdown("### Narrativa comparativa")
+        st.markdown(current_narrative.get("narrative_markdown") or "")
+
+with tabs[10]:
+    st.subheader("Comparador de jugadores")
+    st.write("Compara jugadores dentro del mismo partido o entre partidos distintos con lectura estadística y contextual.")
+
+    player_match_labels = list(options.keys())
+    player_default_a_index = next((idx for idx, label in enumerate(player_match_labels) if options[label] == 7534), 0)
+    player_selector_cols = st.columns(2)
+    player_label_a = player_selector_cols[0].selectbox(
+        "Partido A para jugador",
+        player_match_labels,
+        index=player_default_a_index,
+        key="player_comparison_match_a",
+    )
+    player_label_b = player_selector_cols[1].selectbox(
+        "Partido B para jugador",
+        player_match_labels,
+        index=player_default_a_index,
+        key="player_comparison_match_b",
+    )
+    player_match_a = options[player_label_a]
+    player_match_b = options[player_label_b]
+
+    players_a = load_players_for_match(player_match_a)
+    players_b = load_players_for_match(player_match_b)
+    player_options_a = {
+        f"{row.get('player_name')} | {row.get('team_name')} | {row.get('events')} eventos": int(row["player_id"])
+        for row in players_a
+        if row.get("player_id") is not None
+    }
+    player_options_b = {
+        f"{row.get('player_name')} | {row.get('team_name')} | {row.get('events')} eventos": int(row["player_id"])
+        for row in players_b
+        if row.get("player_id") is not None
+    }
+
+    if not player_options_a or not player_options_b:
+        st.warning("No hay jugadores disponibles para uno de los partidos seleccionados.")
+    else:
+        default_player_a = next(
+            (label for label, player_id in player_options_a.items() if player_id == 5503),
+            next(iter(player_options_a)),
+        )
+        default_player_b = next(
+            (
+                label
+                for label, player_id in player_options_b.items()
+                if player_options_b[label] != player_options_a.get(default_player_a)
+            ),
+            next(iter(player_options_b)),
+        )
+        player_cols = st.columns(2)
+        selected_player_label_a = player_cols[0].selectbox(
+            "Jugador A",
+            list(player_options_a.keys()),
+            index=list(player_options_a.keys()).index(default_player_a),
+            key="player_comparison_player_a",
+        )
+        selected_player_label_b = player_cols[1].selectbox(
+            "Jugador B",
+            list(player_options_b.keys()),
+            index=list(player_options_b.keys()).index(default_player_b),
+            key="player_comparison_player_b",
+        )
+        player_id_a = player_options_a[selected_player_label_a]
+        player_id_b = player_options_b[selected_player_label_b]
+        player_comparison_key = f"player_comparison_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+        player_narrative_key = f"player_comparison_narrative_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+
+        player_action_cols = st.columns(3)
+        if player_action_cols[0].button("Comparar jugadores"):
+            with st.spinner("Comparando jugadores..."):
+                try:
+                    st.session_state[player_comparison_key] = compare_players(
+                        player_match_a,
+                        player_id_a,
+                        player_match_b,
+                        player_id_b,
+                    )
+                    st.session_state.pop(player_narrative_key, None)
+                except Exception as exc:
+                    st.error(f"No se pudo comparar jugadores: {exc}")
+
+        current_player_comparison = st.session_state.get(player_comparison_key)
+        if player_action_cols[1].button(
+            "Generar narrativa comparativa",
+            disabled=current_player_comparison is None,
+            key="player_comparison_generate_narrative",
+        ):
+            with st.spinner("Generando narrativa comparativa de jugadores..."):
+                try:
+                    st.session_state[player_narrative_key] = generate_player_comparison_narrative(
+                        player_match_a,
+                        player_id_a,
+                        player_match_b,
+                        player_id_b,
+                        use_api=False,
+                    )
+                except Exception as exc:
+                    st.error(f"No se pudo generar narrativa comparativa: {exc}")
+
+        current_player_narrative = st.session_state.get(player_narrative_key)
+        if player_action_cols[2].button(
+            "Guardar comparación",
+            disabled=current_player_comparison is None,
+            key="player_comparison_save",
+        ):
+            if current_player_comparison:
+                try:
+                    paths = save_player_comparison(current_player_comparison, current_player_narrative)
+                    st.success(f"Comparación guardada: {paths['markdown']} | {paths['json']}")
+                except Exception as exc:
+                    st.error(f"No se pudo guardar la comparación: {exc}")
+
+        if current_player_comparison:
+            player_a = current_player_comparison.get("player_a", {})
+            player_b = current_player_comparison.get("player_b", {})
+            player_summary = current_player_comparison.get("summary_comparison", {})
+            summary_cols = st.columns(2)
+            with summary_cols[0]:
+                st.markdown("### Jugador A")
+                st.write(f"{player_a.get('player_name')} ({player_a.get('team_name')})")
+                a_cols = st.columns(4)
+                a_cols[0].metric("Goles", player_a.get("goals"))
+                a_cols[1].metric("xG", format_float(player_a.get("xg")))
+                a_cols[2].metric("Pases clave", player_a.get("key_passes"))
+                a_cols[3].metric("Impacto", format_float(player_a.get("impact_score")))
+            with summary_cols[1]:
+                st.markdown("### Jugador B")
+                st.write(f"{player_b.get('player_name')} ({player_b.get('team_name')})")
+                b_cols = st.columns(4)
+                b_cols[0].metric("Goles", player_b.get("goals"))
+                b_cols[1].metric("xG", format_float(player_b.get("xg")))
+                b_cols[2].metric("Pases clave", player_b.get("key_passes"))
+                b_cols[3].metric("Impacto", format_float(player_b.get("impact_score")))
+
+            radar_metrics = build_player_radar_metrics(current_player_comparison)
+            strengths_weaknesses = plot_player_strengths_weaknesses(radar_metrics)
+            st.markdown("### Radar comparativo")
+            st.plotly_chart(plot_player_radar(radar_metrics), width="stretch")
+
+            visual_cols = st.columns(2)
+            with visual_cols[0]:
+                st.markdown("### Métricas comparativas")
+                st.plotly_chart(plot_player_metric_bars(current_player_comparison), width="stretch")
+            with visual_cols[1]:
+                st.markdown("### Perfil por grupos")
+                st.plotly_chart(plot_player_profile_groups(current_player_comparison), width="stretch")
+
+            st.markdown("### Fortalezas y debilidades")
+            sw_cols = st.columns(2)
+            with sw_cols[0]:
+                st.write(f"**{radar_metrics.get('player_a', {}).get('name') or 'Jugador A'}**")
+                st.write("Fortalezas")
+                st.write(strengths_weaknesses.get("player_a_strengths", []) or ["Sin fortalezas >= 70"])
+                st.write("Debilidades")
+                st.write(strengths_weaknesses.get("player_a_weaknesses", []) or ["Sin debilidades <= 30"])
+            with sw_cols[1]:
+                st.write(f"**{radar_metrics.get('player_b', {}).get('name') or 'Jugador B'}**")
+                st.write("Fortalezas")
+                st.write(strengths_weaknesses.get("player_b_strengths", []) or ["Sin fortalezas >= 70"])
+                st.write("Debilidades")
+                st.write(strengths_weaknesses.get("player_b_weaknesses", []) or ["Sin debilidades <= 30"])
+            for warning in strengths_weaknesses.get("warnings", []):
+                st.info(warning)
+
+            diff_rows = [
+                {"métrica": "Goles", "diferencia_b_menos_a": player_summary.get("diff_goals")},
+                {"métrica": "xG", "diferencia_b_menos_a": player_summary.get("diff_xg")},
+                {"métrica": "Tiros", "diferencia_b_menos_a": player_summary.get("diff_shots")},
+                {"métrica": "Asistencias", "diferencia_b_menos_a": player_summary.get("diff_assists")},
+                {"métrica": "Pases clave", "diferencia_b_menos_a": player_summary.get("diff_key_passes")},
+                {"métrica": "Presiones", "diferencia_b_menos_a": player_summary.get("diff_pressures")},
+                {"métrica": "Impact score", "diferencia_b_menos_a": player_summary.get("diff_impact_score")},
+            ]
+            st.markdown("### Diferencias")
+            st.dataframe(pd.DataFrame(diff_rows), width="stretch")
+
+            comparison_sections = {
+                "Comparación ofensiva": current_player_comparison.get("attacking_comparison", {}),
+                "Comparación de pases": current_player_comparison.get("passing_comparison", {}),
+                "Comparación defensiva": current_player_comparison.get("defensive_comparison", {}),
+                "Impacto": current_player_comparison.get("impact_comparison", {}),
+            }
+            for section_title, section in comparison_sections.items():
+                rows = [
+                    {
+                        "métrica": metric,
+                        "jugador_a": values.get("player_a"),
+                        "jugador_b": values.get("player_b"),
+                        "diferencia_b_menos_a": values.get("difference_b_minus_a"),
+                        "mayor": values.get("higher_player"),
+                    }
+                    for metric, values in section.items()
+                    if isinstance(values, dict)
+                ]
+                st.markdown(f"### {section_title}")
+                st.dataframe(pd.DataFrame(rows), width="stretch")
+
+            key_moments_player = current_player_comparison.get("key_moments_comparison", {})
+            moment_cols = st.columns(2)
+            with moment_cols[0]:
+                st.markdown("### Momentos Jugador A")
+                st.dataframe(pd.DataFrame(key_moments_player.get("rows_a", [])), width="stretch")
+            with moment_cols[1]:
+                st.markdown("### Momentos Jugador B")
+                st.dataframe(pd.DataFrame(key_moments_player.get("rows_b", [])), width="stretch")
+
+            player_warnings = current_player_comparison.get("warnings", [])
+            if player_warnings:
+                st.warning("Advertencias de comparación")
+                for warning in player_warnings:
+                    st.write(f"- {warning}")
+
+        if current_player_narrative:
+            narrative_warnings = current_player_narrative.get("warnings", [])
+            if narrative_warnings:
+                st.info("Narrativa generada con avisos.")
+                for warning in narrative_warnings:
+                    st.write(f"- {warning}")
+            st.markdown("### Narrativa comparativa de jugadores")
+            st.markdown(current_player_narrative.get("narrative_markdown") or "")
+
+with tabs[11]:
     st.subheader("Momentos clave")
     st.write("Timeline simple con goles, ocasiones claras, tarjetas, penaltis, asistencias y cambios.")
     key_moments = detail["key_moments"]
@@ -745,7 +1254,7 @@ with tabs[9]:
                     }
                 )
 
-with tabs[10]:
+with tabs[12]:
     st.subheader("Datos")
     st.write("Tablas de respaldo y export del contexto analítico para futuras fases.")
     data_tabs = st.tabs(
