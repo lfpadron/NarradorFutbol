@@ -13,6 +13,7 @@ El proyecto ya cubre las primeras capas del sistema:
 - interfaz Streamlit basica
 - TUI local de control
 - Narrador AI v1 con fallback local sin credenciales
+- Narrador AI v2 con estilos especializados por audiencia
 - reportes finales en Markdown, HTML y JSON
 - exportadores profesionales en PDF y DOCX
 
@@ -133,6 +134,13 @@ narrador-futbol/
    |  |- review_report.py
    |  |- narrative_store.py
    |  `- run_narrator.py
+   |- narrative_v2/
+   |  |- style_profiles.py
+   |  |- prompt_builder_v2.py
+   |  |- narrator_v2.py
+   |  |- section_builder.py
+   |  |- style_evaluator.py
+   |  `- run_narrator_v2.py
    |- reports/
    |  |- report_builder.py
    |  |- markdown_report.py
@@ -370,6 +378,47 @@ Tonos disponibles:
 - `television`
 
 El `fact_guard` agrega advertencias simples si detecta posibles contradicciones con el contexto, como marcador distinto, empate inexistente, goleada no sustentada, penales o rojas no registradas.
+
+## Narrador AI v2
+
+Narrador AI v2 no reemplaza al narrador basico. Vive en `src/narrative_v2/` y genera narrativas especializadas por audiencia:
+
+- `tactico`
+- `television`
+- `periodistico`
+- `scouting`
+- `ejecutivo`
+
+Generar narrativa tactica sin API:
+
+```bash
+uv run python -m src.narrative_v2.run_narrator_v2 --match-id 7534 --style tactico --no-api
+```
+
+Generar narrativa scouting sin API:
+
+```bash
+uv run python -m src.narrative_v2.run_narrator_v2 --match-id 7534 --style scouting --no-api
+```
+
+Comparar todos los estilos:
+
+```bash
+uv run python -m src.narrative_v2.run_narrator_v2 --match-id 7534 --compare --no-api
+```
+
+Guardar narrativa v2:
+
+```bash
+uv run python -m src.narrative_v2.run_narrator_v2 --match-id 7534 --style periodistico --save --no-api
+```
+
+Las salidas guardadas usan sufijo de fecha/hora:
+
+- `data/analytics/exports/narrative_v2.match-7534.tactico_YYYYMMDD_HHMMSS.md`
+- `data/analytics/exports/narrative_v2.match-7534.tactico_YYYYMMDD_HHMMSS.json`
+
+Si `OPENAI_API_KEY` esta configurada y no usas `--no-api`, v2 usa el modelo de `OPENAI_MODEL`. Sin API, usa fallback local especializado para cada estilo.
 
 ## Evaluación del narrador
 

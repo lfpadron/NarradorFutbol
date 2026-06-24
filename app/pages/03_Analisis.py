@@ -23,6 +23,12 @@ from src.narrative.narrator import generate_match_narrative
 from src.narrative.quality_checker import evaluate_narrative_quality
 from src.narrative.review_report import build_review_report, save_review_report
 from src.narrative.tone_comparison import compare_tones
+from src.narrative_v2.narrator_v2 import (
+    compare_specialized_styles,
+    generate_specialized_narrative,
+    save_specialized_narrative,
+)
+from src.narrative_v2.style_profiles import STYLE_PROFILES
 from src.reports.html_report import render_html_report
 from src.reports.markdown_report import render_markdown_report
 from src.reports.report_builder import build_match_report
@@ -127,6 +133,7 @@ tabs = st.tabs(
         "Momentum",
         "Análisis avanzado",
         "Narrador AI",
+        "Narrador AI v2",
         "Momentos clave",
         "Datos",
     ]
@@ -533,6 +540,100 @@ with tabs[6]:
         st.info("Todavía no hay reportes registrados en historial.")
 
 with tabs[7]:
+    st.subheader("Narrador AI v2")
+    st.write("Narrativas especializadas por audiencia.")
+
+    style_labels = {
+        "Táctico": "tactico",
+        "Televisión": "television",
+        "Periodístico": "periodistico",
+        "Scouting": "scouting",
+        "Ejecutivo": "ejecutivo",
+    }
+    selected_v2_label = st.selectbox("Estilo v2", list(style_labels.keys()))
+    selected_style_id = style_labels[selected_v2_label]
+    selected_profile = STYLE_PROFILES[selected_style_id]
+    api_key_available_v2 = has_openai_api_key()
+    use_api_v2 = st.checkbox(
+        "Usar OpenAI API",
+        value=api_key_available_v2,
+        key=f"narrative_v2_use_api_{match_id}_{selected_style_id}",
+    )
+
+    if not api_key_available_v2:
+        st.warning("OPENAI_API_KEY no está configurada. Narrador AI v2 usará fallback local.")
+
+    st.caption(
+        f"Audiencia: {selected_profile['audience']} | Objetivo: {selected_profile['objective']}"
+    )
+
+    v2_result_key = f"narrative_v2_result_{match_id}_{selected_style_id}"
+    v2_comparison_key = f"narrative_v2_comparison_{match_id}"
+    v2_cols = st.columns(3)
+    if v2_cols[0].button("Generar narrativa v2"):
+        with st.spinner("Generando narrativa especializada..."):
+            st.session_state[v2_result_key] = generate_specialized_narrative(
+                match_id,
+                selected_style_id,
+                use_api=use_api_v2,
+            )
+
+    if v2_cols[1].button("Comparar estilos"):
+        with st.spinner("Comparando estilos v2..."):
+            st.session_state[v2_comparison_key] = compare_specialized_styles(
+                match_id,
+                use_api=use_api_v2,
+            )
+
+    v2_result = st.session_state.get(v2_result_key)
+    if v2_cols[2].button("Guardar narrativa v2", disabled=v2_result is None):
+        if v2_result:
+            md_path, json_path = save_specialized_narrative(v2_result)
+            st.success(f"Narrativa v2 guardada: {md_path} | {json_path}")
+
+    if v2_result:
+        st.markdown("### Resultado v2")
+        v2_quality = v2_result.get("style_quality", {})
+        metric_cols = st.columns(5)
+        metric_cols[0].metric("Status", v2_result.get("status"))
+        metric_cols[1].metric("Estilo", v2_result.get("style_name"))
+        metric_cols[2].metric("Score", v2_quality.get("style_score"))
+        metric_cols[3].metric("Estructura", v2_quality.get("structure_score"))
+        metric_cols[4].metric("Factualidad", v2_quality.get("factuality_score"))
+
+        fact_warnings = v2_result.get("fact_warnings", [])
+        if fact_warnings:
+            st.warning("Fact warnings")
+            for warning in fact_warnings:
+                st.write(f"- {warning}")
+        else:
+            st.success("Sin fact warnings.")
+
+        style_warnings = v2_quality.get("warnings", [])
+        if style_warnings:
+            st.warning("Style quality warnings")
+            for warning in style_warnings:
+                st.write(f"- {warning}")
+
+        st.json(v2_quality, expanded=False)
+        st.markdown(v2_result.get("narrative_markdown") or "")
+
+    v2_comparison = st.session_state.get(v2_comparison_key)
+    if v2_comparison:
+        st.markdown("### Comparación de estilos v2")
+        comparison_rows = [
+            {
+                "estilo": row.get("style_name"),
+                "status": row.get("status"),
+                "score": row.get("style_score"),
+                "fact_warnings": row.get("fact_warnings_count"),
+            }
+            for row in v2_comparison.get("styles", [])
+        ]
+        st.dataframe(pd.DataFrame(comparison_rows), width="stretch")
+        st.success(f"Mejor estilo sugerido: {v2_comparison.get('best_style')}")
+
+with tabs[8]:
     st.subheader("Momentos clave")
     st.write("Timeline simple con goles, ocasiones claras, tarjetas, penaltis, asistencias y cambios.")
     key_moments = detail["key_moments"]
@@ -555,7 +656,7 @@ with tabs[7]:
                     }
                 )
 
-with tabs[8]:
+with tabs[9]:
     st.subheader("Datos")
     st.write("Tablas de respaldo y export del contexto analítico para futuras fases.")
     data_tabs = st.tabs(

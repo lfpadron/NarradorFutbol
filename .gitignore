@@ -33,6 +33,7 @@ data/metadata/*.csv
 data/analytics/*.duckdb
 data/analytics/*.duckdb.wal
 data/analytics/exports/*.json
+data/analytics/exports/narrative_v2*.md
 !data/analytics/.gitkeep
 !data/analytics/exports/.gitkeep
 
