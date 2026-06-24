@@ -28,6 +28,7 @@ ANALYTICS_DIR = DATA_DIR / "analytics"
 ANALYTICS_EXPORTS_DIR = ANALYTICS_DIR / "exports"
 REPORTS_DIR = DATA_DIR / "reports"
 COMPARISONS_DIR = DATA_DIR / "comparisons"
+SCOUTING_DIR = DATA_DIR / "scouting"
 BENCHMARKS_DIR = DATA_DIR / "benchmarks"
 BENCHMARK_RESULTS_DIR = BENCHMARKS_DIR / "results"
 
@@ -43,6 +44,7 @@ ALL_MATCHES_PARQUET = METADATA_DIR / "all_matches.parquet"
 INGESTION_LOG_DB = METADATA_DIR / "ingestion_log.duckdb"
 ANALYTICS_DB = ANALYTICS_DIR / "statsbomb.duckdb"
 REPORT_HISTORY_DB_PATH = ANALYTICS_DIR / "report_history.duckdb"
+SCOUTING_HISTORY_DB_PATH = ANALYTICS_DIR / "scouting_history.duckdb"
 
 RAW_DIRECTORIES = (
     RAW_COMPETITIONS_DIR,
@@ -63,6 +65,7 @@ def ensure_directories() -> None:
         ANALYTICS_EXPORTS_DIR,
         REPORTS_DIR,
         COMPARISONS_DIR,
+        SCOUTING_DIR,
         BENCHMARKS_DIR,
         BENCHMARK_RESULTS_DIR,
     ):

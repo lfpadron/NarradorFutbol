@@ -51,6 +51,9 @@ from src.reports.markdown_report import render_markdown_report
 from src.reports.report_builder import build_match_report
 from src.reports.report_history import build_history_record, list_report_history, record_report_generation
 from src.reports.report_store import save_report
+from src.scouting.scouting_history import list_scouting_history
+from src.scouting.scouting_narrator import generate_scouting_narrative
+from src.scouting.scouting_report import save_scouting_report
 from src.ui.charts import momentum_line, shot_count_bar, xg_bar
 from src.ui.formatters import format_float, format_pct, format_score
 from src.ui.pitch_charts import (
@@ -1230,6 +1233,148 @@ with tabs[10]:
                     st.write(f"- {warning}")
             st.markdown("### Narrativa comparativa de jugadores")
             st.markdown(current_player_narrative.get("narrative_markdown") or "")
+
+        st.markdown("### Scouting AI")
+        scouting_api_available = has_openai_api_key()
+        scouting_use_api = st.checkbox(
+            "Usar OpenAI API para Scouting AI",
+            value=scouting_api_available,
+            key=f"scouting_use_api_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}",
+        )
+        if not scouting_api_available:
+            st.caption("OPENAI_API_KEY no está configurada. Scouting AI usará fallback local.")
+
+        scouting_export_cols = st.columns(3)
+        scouting_include_html = scouting_export_cols[0].checkbox(
+            "Generar HTML",
+            value=True,
+            key=f"scouting_export_html_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}",
+        )
+        scouting_include_docx = scouting_export_cols[1].checkbox(
+            "Generar DOCX",
+            value=False,
+            key=f"scouting_export_docx_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}",
+        )
+        scouting_include_pdf = scouting_export_cols[2].checkbox(
+            "Generar PDF",
+            value=False,
+            key=f"scouting_export_pdf_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}",
+        )
+
+        scouting_result_key = f"scouting_result_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+        scouting_paths_key = f"scouting_paths_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+        scouting_cols = st.columns(4)
+        if scouting_cols[0].button(
+            "Scouting individual A",
+            key=f"scouting_individual_a_{player_match_a}_{player_id_a}",
+        ):
+            with st.spinner("Generando scouting individual de Jugador A..."):
+                try:
+                    st.session_state[scouting_result_key] = generate_scouting_narrative(
+                        player_match_a,
+                        player_id_a,
+                        use_api=scouting_use_api,
+                    )
+                    st.session_state.pop(scouting_paths_key, None)
+                except Exception as exc:
+                    st.error(f"No se pudo generar scouting individual A: {exc}")
+
+        if scouting_cols[1].button(
+            "Scouting individual B",
+            key=f"scouting_individual_b_{player_match_b}_{player_id_b}",
+        ):
+            with st.spinner("Generando scouting individual de Jugador B..."):
+                try:
+                    st.session_state[scouting_result_key] = generate_scouting_narrative(
+                        player_match_b,
+                        player_id_b,
+                        use_api=scouting_use_api,
+                    )
+                    st.session_state.pop(scouting_paths_key, None)
+                except Exception as exc:
+                    st.error(f"No se pudo generar scouting individual B: {exc}")
+
+        if scouting_cols[2].button(
+            "Scouting comparativo",
+            key=f"scouting_comparative_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}",
+        ):
+            with st.spinner("Generando scouting comparativo..."):
+                try:
+                    st.session_state[scouting_result_key] = generate_scouting_narrative(
+                        player_match_a,
+                        player_id_a,
+                        player_match_b,
+                        player_id_b,
+                        use_api=scouting_use_api,
+                    )
+                    st.session_state.pop(scouting_paths_key, None)
+                except Exception as exc:
+                    st.error(f"No se pudo generar scouting comparativo: {exc}")
+
+        current_scouting = st.session_state.get(scouting_result_key)
+        if scouting_cols[3].button(
+            "Guardar scouting profesional",
+            disabled=current_scouting is None,
+            key=f"scouting_save_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}",
+        ):
+            if current_scouting:
+                try:
+                    paths = save_scouting_report(
+                        current_scouting,
+                        include_html=scouting_include_html,
+                        include_docx=scouting_include_docx,
+                        include_pdf=scouting_include_pdf,
+                        use_api=scouting_use_api,
+                    )
+                    st.session_state[scouting_paths_key] = paths
+                    st.success("Scouting profesional guardado.")
+                except Exception as exc:
+                    st.error(f"No se pudo guardar scouting: {exc}")
+
+        if current_scouting:
+            scouting_warnings = current_scouting.get("warnings", [])
+            if scouting_warnings:
+                st.warning("Advertencias de Scouting AI")
+                for warning in scouting_warnings:
+                    st.write(f"- {warning}")
+            scouting_language_warnings = current_scouting.get("language_warnings", [])
+            if scouting_language_warnings:
+                st.warning("Warnings de lenguaje")
+                for warning in scouting_language_warnings:
+                    st.write(f"- {warning}")
+            st.markdown(current_scouting.get("narrative_markdown") or "")
+
+        scouting_paths = st.session_state.get(scouting_paths_key)
+        if scouting_paths:
+            st.markdown("#### Rutas generadas")
+            route_labels = {
+                "markdown": "Markdown",
+                "html": "HTML",
+                "json": "JSON",
+                "pdf": "PDF",
+                "docx": "DOCX",
+            }
+            for key, label in route_labels.items():
+                if scouting_paths.get(key):
+                    st.write(f"**{label}:** `{scouting_paths[key]}`")
+            status_cols = st.columns(2)
+            status_cols[0].metric("PDF", scouting_paths.get("pdf_status", "not_requested"))
+            status_cols[1].metric("DOCX", scouting_paths.get("docx_status", "not_requested"))
+            if scouting_paths.get("pdf_warning_message"):
+                st.info(f"PDF: {scouting_paths.get('pdf_warning_message')}")
+            if scouting_paths.get("pdf_error_message"):
+                st.warning(f"PDF: {scouting_paths.get('pdf_error_message')}")
+            if scouting_paths.get("docx_error_message"):
+                st.warning(f"DOCX: {scouting_paths.get('docx_error_message')}")
+            if scouting_paths.get("history_error_message"):
+                st.warning(f"Historial: {scouting_paths.get('history_error_message')}")
+
+        st.markdown("#### Historial de scouting")
+        scouting_history_rows = list_scouting_history(limit=25)
+        if scouting_history_rows:
+            st.dataframe(pd.DataFrame(scouting_history_rows), width="stretch")
+        else:
+            st.caption("Aún no hay historial de scouting.")
 
 with tabs[11]:
     st.subheader("Momentos clave")

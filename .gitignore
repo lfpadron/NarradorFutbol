@@ -43,6 +43,9 @@ data/reports/*
 data/comparisons/*
 !data/comparisons/.gitkeep
 
+data/scouting/*
+!data/scouting/.gitkeep
+
 data/benchmarks/results/*
 !data/benchmarks/.gitkeep
 !data/benchmarks/results/

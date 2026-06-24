@@ -18,6 +18,7 @@ El proyecto ya cubre las primeras capas del sistema:
 - exportadores profesionales en PDF y DOCX
 - comparador de partidos con narrativa comparativa
 - comparador de jugadores para preparar Scouting AI
+- Scouting AI v1.1 con fallback local, lenguaje profesional y export profesional
 
 La app conserva los datos raw sin modificaciones y genera los entregables derivados en `data/`.
 
@@ -163,6 +164,15 @@ narrador-futbol/
    |  |- player_comparison_narrative.py
    |  |- player_comparison_report.py
    |  `- run_player_comparison.py
+   |- scouting/
+   |  |- scouting_context.py
+   |  |- scouting_exporter.py
+   |  |- scouting_history.py
+   |  |- scouting_language_guard.py
+   |  |- scouting_prompt.py
+   |  |- scouting_narrator.py
+   |  |- scouting_report.py
+   |  `- run_scouting.py
    |- reports/
    |  |- report_builder.py
    |  |- markdown_report.py
@@ -592,6 +602,68 @@ Salidas:
 - `data/comparisons/player_visual_data.match-7534.5571_vs_match-7534.5579_YYYYMMDD_HHMMSS.json`
 
 La pestaña **Comparador de jugadores** en Streamlit permite seleccionar Partido A, Jugador A, Partido B y Jugador B, revisar radar, barras, métricas ofensivas, creación, defensa, impacto, fortalezas/debilidades y generar una narrativa comparativa.
+
+## Scouting AI
+
+Scouting AI v1.1 genera reportes profesionales para un jugador individual o para comparar dos jugadores. Usa datos observados del partido, métricas del comparador de jugadores, radar, fortalezas y áreas de cautela.
+
+Reglas de lenguaje:
+
+- tono profesional, claro, sobrio y útil para cuerpo técnico;
+- sin vocabulario altisonante, vulgar, ofensivo, gráfico o sensacionalista;
+- sin metáforas violentas innecesarias ni ridiculización de jugadores, equipos o entrenadores;
+- el bajo rendimiento se expresa como áreas de mejora o cautela;
+- no predice carrera, no inventa minutos y no afirma futuro, fichajes o valor de mercado como hecho.
+
+Con API, Scouting AI usa `OPENAI_API_KEY` y `OPENAI_MODEL`. Sin API, usa fallback local y pasa por el mismo guard de lenguaje.
+
+Scouting individual sin API:
+
+```bash
+uv run python -m src.scouting.run_scouting --match-id 7534 --player-id 5571 --no-api
+```
+
+Scouting comparativo sin API:
+
+```bash
+uv run python -m src.scouting.run_scouting --match-a 7534 --player-a 5571 --match-b 7534 --player-b 5579 --no-api
+```
+
+Export profesional individual:
+
+```bash
+uv run python -m src.scouting.run_scouting --match-id 7534 --player-id 5571 --no-api --save --html --docx --pdf
+```
+
+Export profesional comparativo:
+
+```bash
+uv run python -m src.scouting.run_scouting --match-a 7534 --player-a 5571 --match-b 7534 --player-b 5579 --no-api --save --html --docx --pdf
+```
+
+Historial de scouting:
+
+```bash
+uv run python -m src.scouting.run_scouting --history
+```
+
+Filtrar historial por jugador:
+
+```bash
+uv run python -m src.scouting.run_scouting --history --player-id 5571
+```
+
+Salidas profesionales:
+
+- `data/scouting/scouting.match-7534.5571_YYYYMMDD_HHMMSS.md`
+- `data/scouting/scouting.match-7534.5571_YYYYMMDD_HHMMSS.html`
+- `data/scouting/scouting.match-7534.5571_YYYYMMDD_HHMMSS.json`
+- `data/scouting/scouting.match-7534.5571_YYYYMMDD_HHMMSS.docx`
+- `data/scouting/scouting.match-7534.5571_YYYYMMDD_HHMMSS.pdf`
+- `data/scouting/scouting.match-7534.5571_vs_match-7534.5579_YYYYMMDD_HHMMSS.*`
+- `data/analytics/scouting_history.duckdb`
+
+El PDF usa el flujo tolerante del exportador profesional: intenta WeasyPrint y, si el entorno de Windows no tiene librerías nativas, usa ReportLab. Si ambos fallan, no aborta el proceso; guarda los demás formatos y registra el error en historial.
 
 ## Evaluación del narrador
 
