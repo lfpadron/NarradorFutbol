@@ -19,6 +19,7 @@ El proyecto ya cubre las primeras capas del sistema:
 - comparador de partidos con narrativa comparativa
 - comparador de jugadores para preparar Scouting AI
 - Scouting AI v1.1 con fallback local, lenguaje profesional y export profesional
+- Scouting AI v2 con perfil táctico, arquetipos y comparación avanzada
 
 La app conserva los datos raw sin modificaciones y genera los entregables derivados en `data/`.
 
@@ -165,6 +166,8 @@ narrador-futbol/
    |  |- player_comparison_report.py
    |  `- run_player_comparison.py
    |- scouting/
+   |  |- player_archetypes.py
+   |  |- tactical_profile.py
    |  |- scouting_context.py
    |  |- scouting_exporter.py
    |  |- scouting_history.py
@@ -172,7 +175,10 @@ narrador-futbol/
    |  |- scouting_prompt.py
    |  |- scouting_narrator.py
    |  |- scouting_report.py
-   |  `- run_scouting.py
+   |  |- scouting_v2.py
+   |  |- scouting_v2_report.py
+   |  |- run_scouting.py
+   |  `- run_scouting_v2.py
    |- reports/
    |  |- report_builder.py
    |  |- markdown_report.py
@@ -664,6 +670,57 @@ Salidas profesionales:
 - `data/analytics/scouting_history.duckdb`
 
 El PDF usa el flujo tolerante del exportador profesional: intenta WeasyPrint y, si el entorno de Windows no tiene librerías nativas, usa ReportLab. Si ambos fallan, no aborta el proceso; guarda los demás formatos y registra el error en historial.
+
+### Scouting AI v2
+
+Scouting AI v2 infiere perfiles tácticos y arquetipos desde métricas observadas. El objetivo no es adivinar la posición oficial del jugador, sino responder qué tipo de comportamiento mostró en el partido: amenaza ofensiva, creación, organización, progresión, presión, duelos e impacto.
+
+Arquetipos MVP:
+
+- Finalizador
+- Creador
+- Organizador
+- Recuperador
+- Box-to-box
+- Extremo vertical
+- Extremo creativo
+- Segundo delantero
+- Delantero objetivo
+- Mediocentro constructor
+- Mediocentro destructor
+- Lateral ofensivo
+- Lateral equilibrado
+- Central constructor
+- Central defensivo
+
+Perfil individual:
+
+```bash
+uv run python -m src.scouting.run_scouting_v2 --match-id 7534 --player-id 5571
+```
+
+Comparación de arquetipos:
+
+```bash
+uv run python -m src.scouting.run_scouting_v2 --match-a 7534 --player-a 5571 --match-b 7534 --player-b 5579
+```
+
+Export profesional v2:
+
+```bash
+uv run python -m src.scouting.run_scouting_v2 --match-a 7534 --player-a 5571 --match-b 7534 --player-b 5579 --save --html --docx --pdf
+```
+
+Salidas:
+
+- `data/scouting/scouting_v2.match-7534.5571_YYYYMMDD_HHMMSS.md`
+- `data/scouting/scouting_v2.match-7534.5571_YYYYMMDD_HHMMSS.json`
+- `data/scouting/scouting_v2.match-7534.5571_YYYYMMDD_HHMMSS.html`
+- `data/scouting/scouting_v2.match-7534.5571_YYYYMMDD_HHMMSS.docx`
+- `data/scouting/scouting_v2.match-7534.5571_YYYYMMDD_HHMMSS.pdf`
+- `data/scouting/scouting_v2.match-7534.5571_vs_match-7534.5579_YYYYMMDD_HHMMSS.*`
+
+En la muestra México vs Alemania 2018, el clasificador debe leer a Hirving Lozano como perfil ofensivo cercano a **Segundo delantero** o **Extremo vertical**, y a Joshua Kimmich como **Organizador** o **Mediocentro constructor**. La narrativa explica la razón y conserva advertencias contra interpretación absoluta.
 
 ## Evaluación del narrador
 

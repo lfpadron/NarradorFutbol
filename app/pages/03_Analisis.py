@@ -54,6 +54,8 @@ from src.reports.report_store import save_report
 from src.scouting.scouting_history import list_scouting_history
 from src.scouting.scouting_narrator import generate_scouting_narrative
 from src.scouting.scouting_report import save_scouting_report
+from src.scouting.scouting_v2 import generate_scouting_v2
+from src.scouting.scouting_v2_report import save_scouting_v2_report
 from src.ui.charts import momentum_line, shot_count_bar, xg_bar
 from src.ui.formatters import format_float, format_pct, format_score
 from src.ui.pitch_charts import (
@@ -162,6 +164,7 @@ tabs = st.tabs(
         "Benchmark",
         "Comparador de partidos",
         "Comparador de jugadores",
+        "Scouting AI v2",
         "Momentos clave",
         "Datos",
     ]
@@ -1377,6 +1380,180 @@ with tabs[10]:
             st.caption("Aún no hay historial de scouting.")
 
 with tabs[11]:
+    st.subheader("Scouting AI v2")
+    st.write("Perfil táctico y arquetipos inferidos desde métricas observadas del partido.")
+
+    v2_match_labels = list(options.keys())
+    v2_default_a_index = next((idx for idx, label in enumerate(v2_match_labels) if options[label] == 7534), 0)
+    v2_mode = st.radio(
+        "Modo",
+        ["Individual", "Comparativo"],
+        horizontal=True,
+        key="scouting_v2_mode",
+    )
+    v2_selector_cols = st.columns(2)
+    v2_label_a = v2_selector_cols[0].selectbox(
+        "Partido A",
+        v2_match_labels,
+        index=v2_default_a_index,
+        key="scouting_v2_match_a",
+    )
+    v2_match_a = options[v2_label_a]
+    v2_players_a = list_players_for_match(v2_match_a)
+    if not v2_players_a:
+        st.warning("No hay jugadores transformados para el Partido A.")
+    else:
+        v2_player_options_a = {
+            f"{row.get('player_name')} | {row.get('team_name')} | eventos {row.get('events')} | id {row.get('player_id')}": int(row["player_id"])
+            for row in v2_players_a
+        }
+        v2_default_player_a = next(
+            (label for label, value in v2_player_options_a.items() if value == 5571),
+            next(iter(v2_player_options_a)),
+        )
+        v2_player_label_a = v2_selector_cols[0].selectbox(
+            "Jugador A",
+            list(v2_player_options_a.keys()),
+            index=list(v2_player_options_a.keys()).index(v2_default_player_a),
+            key="scouting_v2_player_a",
+        )
+        v2_player_a = v2_player_options_a[v2_player_label_a]
+
+        v2_match_b = None
+        v2_player_b = None
+        if v2_mode == "Comparativo":
+            v2_label_b = v2_selector_cols[1].selectbox(
+                "Partido B",
+                v2_match_labels,
+                index=v2_default_a_index,
+                key="scouting_v2_match_b",
+            )
+            v2_match_b = options[v2_label_b]
+            v2_players_b = list_players_for_match(v2_match_b)
+            if not v2_players_b:
+                st.warning("No hay jugadores transformados para el Partido B.")
+            else:
+                v2_player_options_b = {
+                    f"{row.get('player_name')} | {row.get('team_name')} | eventos {row.get('events')} | id {row.get('player_id')}": int(row["player_id"])
+                    for row in v2_players_b
+                }
+                v2_default_player_b = next(
+                    (label for label, value in v2_player_options_b.items() if value == 5579),
+                    next(iter(v2_player_options_b)),
+                )
+                v2_player_label_b = v2_selector_cols[1].selectbox(
+                    "Jugador B",
+                    list(v2_player_options_b.keys()),
+                    index=list(v2_player_options_b.keys()).index(v2_default_player_b),
+                    key="scouting_v2_player_b",
+                )
+                v2_player_b = v2_player_options_b[v2_player_label_b]
+
+        export_v2_cols = st.columns(3)
+        v2_include_html = export_v2_cols[0].checkbox("Generar HTML", value=True, key="scouting_v2_html")
+        v2_include_docx = export_v2_cols[1].checkbox("Generar DOCX", value=False, key="scouting_v2_docx")
+        v2_include_pdf = export_v2_cols[2].checkbox("Generar PDF", value=False, key="scouting_v2_pdf")
+
+        v2_result_key = f"scouting_v2_result_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}"
+        v2_paths_key = f"scouting_v2_paths_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}"
+        v2_action_cols = st.columns(2)
+        can_generate_v2 = v2_mode == "Individual" or (v2_match_b is not None and v2_player_b is not None)
+        if v2_action_cols[0].button("Generar Scouting AI v2", disabled=not can_generate_v2):
+            with st.spinner("Generando perfil táctico v2..."):
+                try:
+                    if v2_mode == "Comparativo":
+                        st.session_state[v2_result_key] = generate_scouting_v2(
+                            v2_match_a,
+                            v2_player_a,
+                            int(v2_match_b),
+                            int(v2_player_b),
+                        )
+                    else:
+                        st.session_state[v2_result_key] = generate_scouting_v2(v2_match_a, v2_player_a)
+                    st.session_state.pop(v2_paths_key, None)
+                except Exception as exc:
+                    st.error(f"No se pudo generar Scouting AI v2: {exc}")
+
+        current_v2 = st.session_state.get(v2_result_key)
+        if v2_action_cols[1].button(
+            "Guardar Scouting AI v2",
+            disabled=current_v2 is None,
+            key=f"save_{v2_paths_key}",
+        ):
+            if current_v2:
+                try:
+                    st.session_state[v2_paths_key] = save_scouting_v2_report(
+                        current_v2,
+                        include_html=v2_include_html,
+                        include_docx=v2_include_docx,
+                        include_pdf=v2_include_pdf,
+                    )
+                    st.success("Scouting AI v2 guardado.")
+                except Exception as exc:
+                    st.error(f"No se pudo guardar Scouting AI v2: {exc}")
+
+        if current_v2:
+            profile_a = current_v2.get("profile_a", {})
+            profile_b = current_v2.get("profile_b") or {}
+            metric_cols = st.columns(4)
+            metric_cols[0].metric("Arquetipo A", profile_a.get("archetype"))
+            metric_cols[1].metric("Confianza A", profile_a.get("confidence"))
+            metric_cols[2].metric("Secundario A", profile_a.get("secondary_archetype", {}).get("name"))
+            metric_cols[3].metric("Rol observado A", profile_a.get("position_name"))
+            if profile_b:
+                metric_cols_b = st.columns(4)
+                metric_cols_b[0].metric("Arquetipo B", profile_b.get("archetype"))
+                metric_cols_b[1].metric("Confianza B", profile_b.get("confidence"))
+                metric_cols_b[2].metric("Secundario B", profile_b.get("secondary_archetype", {}).get("name"))
+                metric_cols_b[3].metric("Rol observado B", profile_b.get("position_name"))
+
+            st.plotly_chart(plot_player_radar(current_v2.get("radar_metrics", {})), width="stretch")
+            strength_cols = st.columns(2)
+            with strength_cols[0]:
+                st.markdown("#### Fortalezas A")
+                st.write(profile_a.get("strengths", []) or ["Sin fortalezas dominantes"])
+                st.markdown("#### Limitaciones A")
+                st.write(profile_a.get("weaknesses", []) or ["Sin limitaciones dominantes"])
+            with strength_cols[1]:
+                if profile_b:
+                    st.markdown("#### Fortalezas B")
+                    st.write(profile_b.get("strengths", []) or ["Sin fortalezas dominantes"])
+                    st.markdown("#### Limitaciones B")
+                    st.write(profile_b.get("weaknesses", []) or ["Sin limitaciones dominantes"])
+                else:
+                    st.markdown("#### Scores de arquetipo")
+                    st.dataframe(pd.DataFrame(profile_a.get("archetype_scores", [])[:8]), width="stretch")
+
+            warnings_v2 = current_v2.get("warnings", [])
+            if warnings_v2:
+                st.warning("Riesgos de interpretación")
+                for warning in warnings_v2:
+                    st.write(f"- {warning}")
+            st.markdown(current_v2.get("narrative_markdown") or "")
+
+        v2_paths = st.session_state.get(v2_paths_key)
+        if v2_paths:
+            st.markdown("#### Rutas generadas")
+            for key, label in {
+                "markdown": "Markdown",
+                "html": "HTML",
+                "json": "JSON",
+                "pdf": "PDF",
+                "docx": "DOCX",
+            }.items():
+                if v2_paths.get(key):
+                    st.write(f"**{label}:** `{v2_paths[key]}`")
+            status_v2_cols = st.columns(2)
+            status_v2_cols[0].metric("PDF", v2_paths.get("pdf_status", "not_requested"))
+            status_v2_cols[1].metric("DOCX", v2_paths.get("docx_status", "not_requested"))
+            if v2_paths.get("pdf_warning_message"):
+                st.info(f"PDF: {v2_paths.get('pdf_warning_message')}")
+            if v2_paths.get("pdf_error_message"):
+                st.warning(f"PDF: {v2_paths.get('pdf_error_message')}")
+            if v2_paths.get("docx_error_message"):
+                st.warning(f"DOCX: {v2_paths.get('docx_error_message')}")
+
+with tabs[12]:
     st.subheader("Momentos clave")
     st.write("Timeline simple con goles, ocasiones claras, tarjetas, penaltis, asistencias y cambios.")
     key_moments = detail["key_moments"]
@@ -1399,7 +1576,7 @@ with tabs[11]:
                     }
                 )
 
-with tabs[12]:
+with tabs[13]:
     st.subheader("Datos")
     st.write("Tablas de respaldo y export del contexto analítico para futuras fases.")
     data_tabs = st.tabs(
