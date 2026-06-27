@@ -109,10 +109,7 @@ def print_quality(quality: dict) -> None:
 
 def print_tone_comparison(comparison: dict) -> None:
     print(f"Tone comparison for match_id={comparison.get('match_id')}")
-    print(
-        "tone | status | overall | factuality | coverage | clarity | "
-        "excitement | tactical_depth | warnings"
-    )
+    print("tone | status | overall | factuality | coverage | clarity | " "excitement | tactical_depth | warnings")
     for row in comparison.get("tones", []):
         print(
             f"{row.get('tone')} | {row.get('status')} | {row.get('overall_score')} | "
@@ -140,10 +137,7 @@ def print_review_report(report: dict) -> None:
         print(f"- {item}")
     print("\nResumen por tono")
     for row in comparison.get("tones", []):
-        print(
-            f"- {row.get('tone')}: overall={row.get('overall_score')}, "
-            f"warnings={len(row.get('warnings', []))}"
-        )
+        print(f"- {row.get('tone')}: overall={row.get('overall_score')}, " f"warnings={len(row.get('warnings', []))}")
 
 
 if __name__ == "__main__":

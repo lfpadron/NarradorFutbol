@@ -20,6 +20,9 @@ El proyecto ya cubre las primeras capas del sistema:
 - comparador de jugadores para preparar Scouting AI
 - Scouting AI v1.1 con fallback local, lenguaje profesional y export profesional
 - Scouting AI v2 con perfil táctico, arquetipos y comparación avanzada
+- gráficas avanzadas de partido en Streamlit
+- autenticación básica por invitación
+- despliegue en contenedor compatible con Docker/Podman
 
 La app conserva los datos raw sin modificaciones y genera los entregables derivados en `data/`.
 
@@ -32,6 +35,78 @@ uv sync
 ```
 
 StatsBomb Open Data no requiere credenciales. Puedes copiar `.env.example` a `.env` si quieres cambiar la ruta de datos.
+
+Variables clave para v01:
+
+```env
+NARRADOR_DATA_DIR=data
+APP_SECRET_KEY=change-me-with-a-long-random-secret
+APP_BASE_URL=http://localhost:8501
+SEED_ADMIN_EMAIL_1=admin1@example.com
+SEED_ADMIN_EMAIL_2=admin2@example.com
+SEED_ADMIN_PASSWORD=ChangeMe-v01!
+INVITATION_TTL_HOURS=72
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+NARRADOR_USER_EMAIL=demo@example.com
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+SMTP_USE_TLS=true
+```
+
+En local, si no configuras SMTP, las invitaciones se muestran en pantalla dentro de la página **Login** para copiarlas manualmente.
+
+## Ejecutar localmente
+
+Preparar datos mínimos:
+
+```bash
+uv run python -m src.ingestion.run_ingestion --match-id 7534
+uv run python -m src.transform.build_duckdb --match-id 7534 --force
+```
+
+Levantar Streamlit:
+
+```bash
+uv run streamlit run app/streamlit_app.py
+```
+
+Entra a la página **Login**. Los admins semilla se crean al iniciar con:
+
+- `SEED_ADMIN_EMAIL_1`
+- `SEED_ADMIN_EMAIL_2`
+- `SEED_ADMIN_PASSWORD`
+
+Después, un admin puede invitar usuarios `analyst`, ver usuarios y activar/desactivar cuentas.
+
+## Ejecutar en contenedor
+
+Podman Compose:
+
+```bash
+podman compose up --build
+```
+
+Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+El contenedor expone Streamlit en `http://localhost:8501` y monta:
+
+- `./data:/app/data`
+- `./input:/app/input`
+- `./output:/app/output`
+- `./data/reports:/app/data/reports`
+- `./data/scouting:/app/data/scouting`
+- `./data/analytics:/app/data/analytics`
+- `./data/security:/app/data/security`
+
+Los secretos no se copian a la imagen; se leen desde `.env` en ejecución.
 
 ## Ejecutar ingesta
 
@@ -74,14 +149,22 @@ narrador-futbol/
 |- uv.lock
 |- requirements.txt
 |- control_tui.bat
+|- podman_tui.bat
+|- podman_tui.py
+|- Containerfile
+|- compose.yaml
+|- .dockerignore
+|- .containerignore
 |- .gitignore
 |- .env.example
 |- app/
 |  |- streamlit_app.py
 |  `- pages/
+|     |- 00_Login.py
 |     |- 01_Ingesta.py
 |     |- 02_Partidos.py
-|     `- 03_Analisis.py
+|     |- 03_Analisis.py
+|     `- 04_Graficas_Avanzadas.py
 |- data/
 |  |- raw/
 |  |  |- competitions/
@@ -91,7 +174,9 @@ narrador-futbol/
 |  |  `- three-sixty/
 |  |- metadata/
 |  |- reports/
-|  `- comparisons/
+|  |- comparisons/
+|  |- scouting/
+|  `- security/
 `- src/
    |- config.py
    |- ingestion/
@@ -111,6 +196,8 @@ narrador-futbol/
    |  |- normalize_360.py
    |  `- schema.py
    |- analytics/
+   |  |- pitch.py
+   |  |- advanced_charts.py
    |  |- db.py
    |  |- advanced_metrics.py
    |  |- dangerous_attacks.py
@@ -179,6 +266,12 @@ narrador-futbol/
    |  |- scouting_v2_report.py
    |  |- run_scouting.py
    |  `- run_scouting_v2.py
+   |- security/
+   |  |- models.py
+   |  |- auth.py
+   |  |- invitations.py
+   |  |- storage.py
+   |  `- streamlit_auth.py
    |- reports/
    |  |- report_builder.py
    |  |- markdown_report.py
@@ -832,7 +925,7 @@ El DOCX usa `python-docx` y debe funcionar localmente sin credenciales. El campo
 
 ## Ejecutar interfaz Streamlit
 
-La Fase 4 agrega una interfaz local para revisar el estado del pipeline, listar partidos transformados y explorar el análisis de un partido.
+La interfaz Streamlit permite revisar el estado del pipeline, listar partidos transformados, explorar análisis, usar narradores AI, exportar reportes y consultar gráficas avanzadas.
 
 ```bash
 uv run streamlit run app/streamlit_app.py
@@ -849,10 +942,12 @@ uv run streamlit run app/streamlit_app.py
 
 La app incluye:
 
+- página Login con autenticación básica, admins semilla e invitaciones
 - página principal con estado de `data/analytics/statsbomb.duckdb`
 - página de ingesta con resumen de `ingestion_log.duckdb`
 - página de partidos transformados con filtros básicos
 - página de análisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presión, posesión, momentum, análisis avanzado, Narrador AI con evaluación/comparación de tonos y reporte final, Narrador AI v2, Benchmark, Comparador de partidos, Comparador de jugadores, momentos clave y export JSON
+- página de gráficas avanzadas con calor de eventos/jugadores, tiros, pases, red de pases, recuperaciones/pérdidas, momentum y zonas de presencia
 
 Visualizaciones futbolísticas disponibles:
 
@@ -864,6 +959,10 @@ Visualizaciones futbolísticas disponibles:
 - momentum por intervalos con tooltip
 - panel/timeline de momentos clave
 - tablas de dominio, xG, ataques peligrosos, jugadores de impacto y validación
+- mapa de calor de eventos o jugador
+- mapa de pases completados
+- recuperaciones y pérdidas
+- zonas de dominio/presencia por cuadrantes
 
 Dependencias visuales principales:
 
@@ -877,6 +976,27 @@ Ejecutar Streamlit:
 ```bash
 uv run streamlit run app/streamlit_app.py
 ```
+
+## Seguridad v01
+
+La v01 incluye autenticación básica para Streamlit:
+
+- usuarios en `data/security/security.sqlite`
+- contraseñas con hash PBKDF2, nunca texto plano
+- roles `admin` y `analyst`
+- admins semilla desde `SEED_ADMIN_EMAIL_1` y `SEED_ADMIN_EMAIL_2`
+- contraseña inicial desde `SEED_ADMIN_PASSWORD`
+- invitaciones con token y expiración
+
+Flujo de invitación:
+
+1. Entrar con un admin semilla en la página **Login**.
+2. Capturar email y rol del usuario.
+3. Enviar por SMTP si está configurado, o copiar el token/enlace mostrado en pantalla.
+4. El usuario abre **Login**, pega el token y crea su contraseña.
+5. El usuario `analyst` puede usar análisis, gráficas y reportes.
+
+Solo `admin` puede invitar, ver usuarios y activar/desactivar cuentas. Si SMTP no está configurado o falla, la app no bloquea el flujo: muestra el enlace/token en pantalla para desarrollo local.
 
 ## TUI de control
 
@@ -899,3 +1019,44 @@ Comando equivalente:
 ```bash
 uv run python -m src.tui.control_tui
 ```
+
+La TUI Podman permite arrancar la máquina Podman, construir la imagen, encender/apagar el servicio Compose, abrir navegador y revisar logs:
+
+```bash
+podman_tui.bat
+```
+
+Comando equivalente:
+
+```bash
+uv run python podman_tui.py
+```
+
+## Calidad v01
+
+Validaciones esperadas antes de cerrar cambios:
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run black --check .
+uv run mypy
+```
+
+## Límites conocidos v01
+
+- La autenticación es básica y local; no incluye OAuth, SSO ni recuperación automática de contraseña.
+- SMTP es opcional; sin servidor configurado, v01 muestra invitaciones en pantalla.
+- Los arquetipos de scouting se infieren desde un partido; deben validarse con más muestra y video.
+- Los PDFs usan fallback ReportLab cuando WeasyPrint no puede cargar librerías nativas.
+- El despliegue en contenedor monta datos en volumen local; no incluye orquestación multiusuario avanzada.
+
+## Roadmap v02
+
+- Recuperación de contraseña y rotación de secretos.
+- Auditoría de uso por página/acción.
+- Heatmaps por jugador con minutos y normalización por tiempo jugado.
+- Freeze frames y datos 360 cuando estén disponibles.
+- Redes de pase profesionales por intervalo y estado del marcador.
+- Más pruebas visuales y snapshots de reportes.
+- Hardening de contenedor para despliegue productivo.

@@ -8,7 +8,6 @@ from typing import Any
 from src.ingestion.utils import to_jsonable
 from src.narrative.config import SUPPORTED_TONES, validate_tone
 
-
 TONE_INSTRUCTIONS = {
     "cronica_emocionante": "Tono de crónica deportiva emocionante, con ritmo y claridad.",
     "analisis_tecnico": "Tono analítico y táctico, priorizando patrones, dominio y eficacia.",
@@ -64,4 +63,3 @@ Contexto curado JSON:
 {context_json}
 ```
 """.strip()
-

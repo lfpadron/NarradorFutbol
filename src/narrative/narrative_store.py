@@ -27,4 +27,3 @@ def save_narrative(result: dict[str, Any]) -> tuple[str, str]:
 def _safe_token(value: str) -> str:
     clean = re.sub(r"[^a-zA-Z0-9_-]+", "-", value.strip())
     return clean.strip("-") or "narrativa"
-

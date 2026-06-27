@@ -1,2 +1,1 @@
 """Final report generation layer."""
-

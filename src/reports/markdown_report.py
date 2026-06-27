@@ -97,7 +97,9 @@ def _team_stats_table(analytics: dict[str, Any]) -> str:
     team_stats = analytics.get("team_stats", [])
     dangerous_counts = _dangerous_counts(analytics.get("dangerous_attacks", []))
     possession_summary = analytics.get("possession_summary", {})
-    possessions_by_team = possession_summary.get("possessions_by_team", {}) if isinstance(possession_summary, dict) else {}
+    possessions_by_team = (
+        possession_summary.get("possessions_by_team", {}) if isinstance(possession_summary, dict) else {}
+    )
     lines = [
         "| Equipo | Tiros | Goles | xG | Pases | Precisión pase | Posesiones | Ataques peligrosos |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -122,9 +124,7 @@ def _dominance_reading(report: dict[str, Any]) -> str:
     if not dominance:
         return "No hay datos de dominio disponibles."
     leader = dominance[0]
-    xg_lines = ", ".join(
-        f"{row.get('team_name')} xG {row.get('xg_total')}" for row in xg_breakdown
-    )
+    xg_lines = ", ".join(f"{row.get('team_name')} xG {row.get('xg_total')}" for row in xg_breakdown)
     return (
         f"El equipo dominante por volumen fue **{leader.get('team_name')}**, con "
         f"{leader.get('shots')} tiros, {leader.get('final_third_entries')} entradas al último tercio "
@@ -140,9 +140,7 @@ def _key_moments(key_moments: list[dict[str, Any]]) -> str:
     lines = []
     for moment in key_moments:
         second = int(moment.get("second") or 0)
-        lines.append(
-            f"- {moment.get('minute')}:{second:02d} — **{moment.get('type')}** — {moment.get('title')}"
-        )
+        lines.append(f"- {moment.get('minute')}:{second:02d} — **{moment.get('type')}** — {moment.get('title')}")
     return "\n".join(lines)
 
 
@@ -225,4 +223,3 @@ def _number(value: Any) -> str:
 
 def _value(value: Any) -> str:
     return str(value) if value not in (None, "") else "N/D"
-

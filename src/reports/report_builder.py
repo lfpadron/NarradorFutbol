@@ -22,8 +22,7 @@ def build_match_report(
     quality = evaluate_narrative_quality(narrative["narrative_markdown"], context)
     validation = context.get("validation", {})
     validation_warnings = [
-        f"{finding.get('severity')}: {finding.get('message')}"
-        for finding in validation.get("findings", [])
+        f"{finding.get('severity')}: {finding.get('message')}" for finding in validation.get("findings", [])
     ]
     warnings = list(narrative.get("warnings") or []) + list(quality.get("warnings") or []) + validation_warnings
 
@@ -77,4 +76,3 @@ def _get_match_metadata(match_id: int) -> dict[str, Any]:
         (match_id,),
     )
     return row or {}
-

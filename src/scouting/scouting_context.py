@@ -8,7 +8,6 @@ from src.comparison.player_comparison import build_player_radar_metrics, compare
 from src.comparison.player_visuals import plot_player_strengths_weaknesses
 from src.ingestion.utils import to_jsonable
 
-
 INDIVIDUAL_RADAR_CAPS = {
     "Ataque": 28,
     "Creación": 22,
@@ -85,7 +84,11 @@ def _build_individual_radar_metrics(player: dict[str, Any]) -> dict[str, Any]:
     }
     categories = list(raw.keys())
     values = [
-        0 if INDIVIDUAL_RADAR_CAPS[category] <= 0 else round(min(100, raw[category] / INDIVIDUAL_RADAR_CAPS[category] * 100), 1)
+        (
+            0
+            if INDIVIDUAL_RADAR_CAPS[category] <= 0
+            else round(min(100, raw[category] / INDIVIDUAL_RADAR_CAPS[category] * 100), 1)
+        )
         for category in categories
     ]
     return {
@@ -146,4 +149,3 @@ def _number(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-

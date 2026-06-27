@@ -10,7 +10,6 @@ from src.narrative.config import SUPPORTED_TONES, validate_tone
 from src.narrative.narrator import generate_match_narrative
 from src.narrative.quality_checker import evaluate_narrative_quality
 
-
 DEFAULT_COMPARISON_TONES = [
     "cronica_emocionante",
     "analisis_tecnico",
@@ -31,9 +30,7 @@ def compare_tones(match_id: int, tones: list[str] | None = None, use_api: bool =
         result = generate_match_narrative(match_id, tone=tone, use_api=use_api)
         quality = evaluate_narrative_quality(result["narrative_markdown"], context)
         generation_warnings = list(result.get("warnings") or [])
-        narrative_warnings = [
-            warning for warning in generation_warnings if not _is_operational_warning(str(warning))
-        ]
+        narrative_warnings = [warning for warning in generation_warnings if not _is_operational_warning(str(warning))]
         narrative_warnings.extend(quality.get("warnings") or [])
         rows.append(
             {

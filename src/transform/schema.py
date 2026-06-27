@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import duckdb
 
-
 TABLE_COLUMNS: dict[str, list[str]] = {
     "competition": [
         "competition_id",
@@ -174,8 +173,7 @@ TABLE_COLUMNS: dict[str, list[str]] = {
 
 
 def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
-    connection.execute(
-        """
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS competition (
             competition_id BIGINT PRIMARY KEY,
             competition_name VARCHAR,
@@ -184,19 +182,15 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             competition_youth BOOLEAN,
             competition_international BOOLEAN
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS season (
             season_id BIGINT,
             season_name VARCHAR,
             competition_id BIGINT
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS "match" (
             match_id BIGINT PRIMARY KEY,
             competition_id BIGINT,
@@ -214,29 +208,23 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             match_status VARCHAR,
             data_version VARCHAR
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS team (
             team_id BIGINT PRIMARY KEY,
             team_name VARCHAR,
             country_name VARCHAR
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS player (
             player_id BIGINT PRIMARY KEY,
             player_name VARCHAR,
             nickname VARCHAR,
             country_name VARCHAR
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS lineup (
             match_id BIGINT,
             team_id BIGINT,
@@ -247,10 +235,8 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             position_name VARCHAR,
             starter BOOLEAN
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS event (
             event_id VARCHAR PRIMARY KEY,
             match_id BIGINT,
@@ -280,10 +266,8 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             out BOOLEAN,
             raw_event_json VARCHAR
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS "pass" (
             event_id VARCHAR,
             match_id BIGINT,
@@ -309,10 +293,8 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             pass_goal_assist BOOLEAN,
             pass_through_ball BOOLEAN
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS shot (
             event_id VARCHAR,
             match_id BIGINT,
@@ -332,10 +314,8 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             shot_one_on_one BOOLEAN,
             shot_key_pass_id VARCHAR
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS carry (
             event_id VARCHAR,
             match_id BIGINT,
@@ -343,10 +323,8 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             carry_end_y DOUBLE,
             carry_distance DOUBLE
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS duel (
             event_id VARCHAR,
             match_id BIGINT,
@@ -355,11 +333,9 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             duel_outcome_id BIGINT,
             duel_outcome_name VARCHAR
         )
-        """
-    )
-    connection.execute('CREATE TABLE IF NOT EXISTS pressure (event_id VARCHAR, match_id BIGINT, counterpress BOOLEAN)')
-    connection.execute(
-        """
+        """)
+    connection.execute("CREATE TABLE IF NOT EXISTS pressure (event_id VARCHAR, match_id BIGINT, counterpress BOOLEAN)")
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS foul (
             event_id VARCHAR,
             match_id BIGINT,
@@ -370,10 +346,8 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             card_id BIGINT,
             card_name VARCHAR
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS goalkeeper_action (
             event_id VARCHAR,
             match_id BIGINT,
@@ -390,10 +364,8 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             goalkeeper_end_x DOUBLE,
             goalkeeper_end_y DOUBLE
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS substitution (
             event_id VARCHAR,
             match_id BIGINT,
@@ -402,20 +374,16 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             substitution_outcome_id BIGINT,
             substitution_outcome_name VARCHAR
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS event_relationship (
             source_event_id VARCHAR,
             related_event_id VARCHAR,
             match_id BIGINT,
             relationship_type VARCHAR
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS freeze_frame (
             event_id VARCHAR,
             match_id BIGINT,
@@ -427,19 +395,15 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             location_x DOUBLE,
             location_y DOUBLE
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS visible_area (
             event_id VARCHAR,
             match_id BIGINT,
             visible_area_json VARCHAR
         )
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE TABLE IF NOT EXISTS transformation_log (
             match_id BIGINT PRIMARY KEY,
             events_transformed BOOLEAN,
@@ -452,13 +416,11 @@ def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
             transformed_at TIMESTAMP,
             error_message VARCHAR
         )
-        """
-    )
+        """)
 
 
 def create_views(connection: duckdb.DuckDBPyConnection) -> None:
-    connection.execute(
-        """
+    connection.execute("""
         CREATE OR REPLACE VIEW vw_match_summary AS
         WITH event_counts AS (
             SELECT match_id, COUNT(*) AS total_events
@@ -497,51 +459,39 @@ def create_views(connection: duckdb.DuckDBPyConnection) -> None:
         LEFT JOIN event_counts e ON e.match_id = m.match_id
         LEFT JOIN shot_counts s ON s.match_id = m.match_id
         LEFT JOIN pass_counts p ON p.match_id = m.match_id
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE OR REPLACE VIEW vw_shots AS
         SELECT e.*, s.* EXCLUDE (event_id, match_id)
         FROM event e
         INNER JOIN shot s ON s.event_id = e.event_id
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE OR REPLACE VIEW vw_goals AS
         SELECT *
         FROM vw_shots
         WHERE shot_outcome_name = 'Goal'
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE OR REPLACE VIEW vw_passes AS
         SELECT e.*, p.* EXCLUDE (event_id, match_id)
         FROM event e
         INNER JOIN "pass" p ON p.event_id = e.event_id
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE OR REPLACE VIEW vw_team_event_counts AS
         SELECT match_id, team_id, team_name, type_id, type_name, COUNT(*) AS events_count
         FROM event
         GROUP BY match_id, team_id, team_name, type_id, type_name
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE OR REPLACE VIEW vw_player_event_counts AS
         SELECT match_id, player_id, player_name, type_id, type_name, COUNT(*) AS events_count
         FROM event
         WHERE player_id IS NOT NULL
         GROUP BY match_id, player_id, player_name, type_id, type_name
-        """
-    )
-    connection.execute(
-        """
+        """)
+    connection.execute("""
         CREATE OR REPLACE VIEW vw_ai_match_context AS
         SELECT
             match_id,
@@ -555,5 +505,4 @@ def create_views(connection: duckdb.DuckDBPyConnection) -> None:
             total_passes,
             total_xg
         FROM vw_match_summary
-        """
-    )
+        """)

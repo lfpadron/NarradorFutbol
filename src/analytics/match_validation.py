@@ -10,7 +10,6 @@ from src.analytics.dominance_analysis import get_match_dominance
 from src.analytics.match_summary import get_match_summary
 from src.analytics.xg_analysis import get_xg_breakdown
 
-
 REFERENCE_MATCH_ID = 7534
 
 

@@ -1,2 +1,1 @@
 """Match comparison utilities."""
-

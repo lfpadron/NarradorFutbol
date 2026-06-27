@@ -5,9 +5,10 @@ import pandas as pd
 import streamlit as st
 
 from src.config import INGESTION_LOG_DB
-
+from src.security.streamlit_auth import require_login
 
 st.set_page_config(page_title="Ingesta", layout="wide")
+require_login()
 st.title("Ingesta")
 
 
@@ -19,8 +20,7 @@ def load_ingestion_summary() -> dict[str, object]:
     try:
         with duckdb.connect(str(INGESTION_LOG_DB), read_only=True) as connection:
             total_matches = connection.execute("SELECT COUNT(*) FROM ingestion_log").fetchone()[0]
-            status_rows = connection.execute(
-                """
+            status_rows = connection.execute("""
                 SELECT
                     events_status,
                     lineups_status,
@@ -29,10 +29,8 @@ def load_ingestion_summary() -> dict[str, object]:
                 FROM ingestion_log
                 GROUP BY events_status, lineups_status, three_sixty_status
                 ORDER BY rows DESC
-                """
-            ).fetchdf()
-            counts = connection.execute(
-                """
+                """).fetchdf()
+            counts = connection.execute("""
                 SELECT
                     SUM(CASE WHEN events_status IN ('downloaded', 'skipped_existing') THEN 1 ELSE 0 END) AS events_downloaded,
                     SUM(CASE WHEN lineups_status IN ('downloaded', 'skipped_existing') THEN 1 ELSE 0 END) AS lineups_downloaded,
@@ -40,10 +38,8 @@ def load_ingestion_summary() -> dict[str, object]:
                     SUM(CASE WHEN three_sixty_status = 'not_available' THEN 1 ELSE 0 END) AS three_sixty_not_available,
                     SUM(CASE WHEN three_sixty_status = 'failed' THEN 1 ELSE 0 END) AS three_sixty_failed
                 FROM ingestion_log
-                """
-            ).fetchone()
-            errors = connection.execute(
-                """
+                """).fetchone()
+            errors = connection.execute("""
                 SELECT
                     match_id,
                     home_team,
@@ -60,8 +56,7 @@ def load_ingestion_summary() -> dict[str, object]:
                    OR three_sixty_status = 'failed'
                 ORDER BY last_attempt_at DESC NULLS LAST
                 LIMIT 20
-                """
-            ).fetchdf()
+                """).fetchdf()
             return {
                 "exists": True,
                 "total_matches": total_matches,

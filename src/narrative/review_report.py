@@ -56,7 +56,9 @@ def _build_recommendations(comparison: dict[str, Any]) -> list[str]:
     low_coverage = [row for row in tones if int(row.get("coverage_score") or 0) < 75]
     if low_coverage:
         recommendations.append("Reforzar cobertura de marcador, dominio, xG, jugadores y momentos clave.")
-    factual_warnings = [warning for row in tones for warning in row.get("warnings", []) if "marcador" in warning.lower()]
+    factual_warnings = [
+        warning for row in tones for warning in row.get("warnings", []) if "marcador" in warning.lower()
+    ]
     if factual_warnings:
         recommendations.append("Revisar manualmente las advertencias factuales antes de publicar.")
     if not recommendations:
@@ -109,4 +111,3 @@ def _report_to_markdown(report: dict[str, Any]) -> str:
     lines.extend(f"- {item}" for item in report.get("recommendations", []))
     lines.append("")
     return "\n".join(lines)
-

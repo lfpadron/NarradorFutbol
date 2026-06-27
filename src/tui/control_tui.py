@@ -12,7 +12,6 @@ import threading
 import time
 import webbrowser
 from datetime import datetime
-from pathlib import Path
 from typing import Iterable
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -23,7 +22,6 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Footer, Header, RichLog, Static
 
 from src.config import PROJECT_ROOT
-
 
 APP_TITLE = "Control del sistema Narrador de Fútbol"
 STREAMLIT_PORT = 8501
@@ -358,8 +356,12 @@ def _posix_port_pids(port: int) -> set[int]:
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="TUI de control local para Streamlit.")
-    parser.add_argument("--smoke-test", action="store_true", help="Validate imports and status checks without opening the TUI.")
-    parser.add_argument("--start-stop-test", action="store_true", help="Start Streamlit, validate HTTP status, then stop it.")
+    parser.add_argument(
+        "--smoke-test", action="store_true", help="Validate imports and status checks without opening the TUI."
+    )
+    parser.add_argument(
+        "--start-stop-test", action="store_true", help="Start Streamlit, validate HTTP status, then stop it."
+    )
     return parser.parse_args(argv)
 
 

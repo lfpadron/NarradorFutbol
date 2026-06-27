@@ -113,4 +113,3 @@ def _build_paths(match_a: int, match_b: int) -> tuple[datetime, str, dict[str, P
         if not any(path.exists() for path in paths.values()):
             return exported_at, suffix, paths
         exported_at += timedelta(seconds=1)
-

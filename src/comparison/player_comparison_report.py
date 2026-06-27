@@ -125,4 +125,3 @@ def _build_paths(
         if not any(path.exists() for path in paths.values()):
             return exported_at, suffix, paths
         exported_at += timedelta(seconds=1)
-

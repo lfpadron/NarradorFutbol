@@ -12,7 +12,6 @@ import duckdb
 from src.config import INGESTION_LOG_DB
 from src.ingestion.utils import VALID_STATUSES, as_int, pick_first
 
-
 LOG_COLUMNS = {
     "match_id",
     "competition_id",
@@ -51,8 +50,7 @@ class IngestionLog:
         self.close()
 
     def ensure_schema(self) -> None:
-        self.connection.execute(
-            """
+        self.connection.execute("""
             CREATE TABLE IF NOT EXISTS ingestion_log (
                 match_id BIGINT PRIMARY KEY,
                 competition_id BIGINT,
@@ -72,8 +70,7 @@ class IngestionLog:
                 three_sixty_file_path VARCHAR,
                 transformed_at TIMESTAMP
             )
-            """
-        )
+            """)
 
     def ensure_match(self, match_record: dict[str, Any]) -> int:
         summary = match_summary(match_record)
@@ -150,20 +147,17 @@ class IngestionLog:
         )
 
     def failed_match_ids(self) -> set[int]:
-        rows = self.connection.execute(
-            """
+        rows = self.connection.execute("""
             SELECT match_id
             FROM ingestion_log
             WHERE events_status = 'failed'
                OR lineups_status = 'failed'
                OR three_sixty_status = 'failed'
-            """
-        ).fetchall()
+            """).fetchall()
         return {int(row[0]) for row in rows}
 
     def summary(self) -> list[tuple[str, int]]:
-        rows = self.connection.execute(
-            """
+        rows = self.connection.execute("""
             WITH statuses AS (
                 SELECT events_status AS status FROM ingestion_log
                 UNION ALL
@@ -175,8 +169,7 @@ class IngestionLog:
             FROM statuses
             GROUP BY status
             ORDER BY status
-            """
-        ).fetchall()
+            """).fetchall()
         return [(row[0], int(row[1])) for row in rows]
 
     @staticmethod

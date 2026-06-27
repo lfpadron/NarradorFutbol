@@ -7,7 +7,6 @@ from typing import Any
 from src.ingestion.utils import to_jsonable
 from src.narrative_v2.style_profiles import get_style_profile
 
-
 STYLE_CONTEXT_KEYS = {
     "tactico": [
         "match_summary",
@@ -88,4 +87,3 @@ def _limit_value(key: str, value: Any) -> Any:
         limit = LIST_LIMITS.get(key)
         return value[:limit] if limit else value
     return value
-

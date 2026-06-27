@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 import duckdb
@@ -24,7 +23,6 @@ from src.transform.utils import (
     replace_dimension_rows,
 )
 
-
 PER_MATCH_TABLES = [
     "lineup",
     "event",
@@ -43,9 +41,7 @@ PER_MATCH_TABLES = [
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Transform raw StatsBomb JSON into data/analytics/statsbomb.duckdb."
-    )
+    parser = argparse.ArgumentParser(description="Transform raw StatsBomb JSON into data/analytics/statsbomb.duckdb.")
     parser.add_argument(
         "--limit",
         type=int,
@@ -128,10 +124,7 @@ def select_match_ids(match_id: int | None, limit: int | None) -> list[int]:
 
     match_ids = sorted(
         match_id
-        for match_id in (
-            match_id_from_path(path, EVENT_FILE_RE)
-            for path in RAW_EVENTS_DIR.glob("events.match-*.json")
-        )
+        for match_id in (match_id_from_path(path, EVENT_FILE_RE) for path in RAW_EVENTS_DIR.glob("events.match-*.json"))
         if match_id is not None
     )
 

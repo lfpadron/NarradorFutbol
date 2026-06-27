@@ -39,4 +39,3 @@ def run_v2_narrative_regression(match_id: int, use_api: bool = False) -> dict[st
         "min_style_score": min_score,
         "comparison": comparison,
     }
-

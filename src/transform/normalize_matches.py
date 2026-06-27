@@ -9,7 +9,6 @@ from typing import Any
 from src.config import RAW_MATCHES_DIR
 from src.transform.utils import as_int, as_str, load_records, nested_get
 
-
 MATCH_FILE_RE = re.compile(r"competition-(?P<competition_id>\d+)\.season-(?P<season_id>\d+)\.json$")
 
 
@@ -31,8 +30,12 @@ def normalize_matches(raw_matches_dir: Path = RAW_MATCHES_DIR) -> dict[str, list
 
             home_team_id = as_int(home_team.get("home_team_id") or home_team.get("team_id") or home_team.get("id"))
             away_team_id = as_int(away_team.get("away_team_id") or away_team.get("team_id") or away_team.get("id"))
-            home_team_name = as_str(home_team.get("home_team_name") or home_team.get("team_name") or home_team.get("name"))
-            away_team_name = as_str(away_team.get("away_team_name") or away_team.get("team_name") or away_team.get("name"))
+            home_team_name = as_str(
+                home_team.get("home_team_name") or home_team.get("team_name") or home_team.get("name")
+            )
+            away_team_name = as_str(
+                away_team.get("away_team_name") or away_team.get("team_name") or away_team.get("name")
+            )
 
             match_rows[match_id] = {
                 "match_id": match_id,

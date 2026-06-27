@@ -16,7 +16,6 @@ from src.transform.utils import (
     json_text,
     load_records,
     match_id_from_path,
-    nested_get,
     object_id,
     object_name,
     point,

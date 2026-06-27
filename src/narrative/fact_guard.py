@@ -6,11 +6,8 @@ import re
 import unicodedata
 from typing import Any
 
-
 SCORE_RE = re.compile(r"\b(\d{1,2})\s*[-–]\s*(\d{1,2})\b")
-NAME_RE = re.compile(
-    r"\b([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+(?:\s+[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+){1,4})\b"
-)
+NAME_RE = re.compile(r"\b([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+(?:\s+[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+){1,4})\b")
 GOAL_CLAIM_RE = re.compile(
     r"(?i:gol de|anot[óo]|marc[óo])\s+"
     r"([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+"
@@ -168,10 +165,10 @@ def _is_team_or_common_phrase(candidate_norm: str, context: dict[str, Any]) -> b
     teams = _participant_aliases(summary)
     teams.update(
         {
-        "fifa world cup",
-        "openai api",
-        "statsbomb",
-    }
+            "fifa world cup",
+            "openai api",
+            "statsbomb",
+        }
     )
     return candidate_norm in teams
 
@@ -226,12 +223,7 @@ def _check_goal_scorer_claims(narrative: str, context: dict[str, Any], warnings:
 
 def _has_key_moment(key_moments: list[dict[str, Any]], needles: tuple[str, ...]) -> bool:
     for moment in key_moments:
-        haystack = normalize_text(
-            " ".join(
-                str(moment.get(key) or "")
-                for key in ("type", "title", "description")
-            )
-        )
+        haystack = normalize_text(" ".join(str(moment.get(key) or "") for key in ("type", "title", "description")))
         if any(needle in haystack for needle in needles):
             return True
     return False
@@ -247,9 +239,7 @@ def _context_has_comeback(context: dict[str, Any]) -> bool:
     score = {home: 0, away: 0}
     trailed = False
     goals = [
-        moment
-        for moment in context.get("key_moments", [])
-        if normalize_text(str(moment.get("type") or "")) == "goal"
+        moment for moment in context.get("key_moments", []) if normalize_text(str(moment.get("type") or "")) == "goal"
     ]
     for goal in sorted(goals, key=lambda row: (int(row.get("minute") or 0), int(row.get("second") or 0))):
         team = goal.get("team_name")

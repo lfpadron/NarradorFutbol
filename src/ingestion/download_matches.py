@@ -21,7 +21,6 @@ from src.ingestion.utils import (
     write_json,
 )
 
-
 MATCH_FILE_RE = re.compile(r"competition-(?P<competition_id>\d+)\.season-(?P<season_id>\d+)\.json$")
 
 
@@ -81,9 +80,7 @@ def _prepare_for_parquet(df: pd.DataFrame) -> pd.DataFrame:
     for column in clean.columns:
         if clean[column].map(lambda value: isinstance(value, (dict, list, tuple, set))).any():
             clean[column] = clean[column].map(
-                lambda value: _json_string(value)
-                if isinstance(value, (dict, list, tuple, set))
-                else value
+                lambda value: _json_string(value) if isinstance(value, (dict, list, tuple, set)) else value
             )
     return clean
 
@@ -121,9 +118,7 @@ def build_master_matches_index() -> pd.DataFrame:
             df[column] = pd.to_numeric(df[column], errors="coerce").astype("Int64")
 
     sort_columns = [
-        column
-        for column in ("competition_id", "season_id", "match_date", "match_id")
-        if column in df.columns
+        column for column in ("competition_id", "season_id", "match_date", "match_id") if column in df.columns
     ]
     if sort_columns:
         df = df.sort_values(sort_columns, kind="stable")

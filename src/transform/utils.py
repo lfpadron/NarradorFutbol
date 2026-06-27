@@ -13,7 +13,6 @@ import pandas as pd
 
 from src.ingestion.utils import read_json, to_jsonable
 
-
 EVENT_FILE_RE = re.compile(r"events\.match-(?P<match_id>\d+)\.json$")
 LINEUP_FILE_RE = re.compile(r"lineups\.match-(?P<match_id>\d+)\.json$")
 THREE_SIXTY_FILE_RE = re.compile(r"three-sixty\.match-(?P<match_id>\d+)\.json$")
@@ -157,8 +156,7 @@ def insert_rows(
     connection.register(temp_name, frame)
     try:
         connection.execute(
-            f"INSERT INTO {quote_identifier(table_name)} BY NAME "
-            f"SELECT * FROM {quote_identifier(temp_name)}"
+            f"INSERT INTO {quote_identifier(table_name)} BY NAME " f"SELECT * FROM {quote_identifier(temp_name)}"
         )
     finally:
         connection.unregister(temp_name)
@@ -179,8 +177,7 @@ def replace_dimension_rows(
     target = quote_identifier(table_name)
     temp = quote_identifier(temp_name)
     predicates = " AND ".join(
-        f"{target}.{quote_identifier(column)} = {temp}.{quote_identifier(column)}"
-        for column in key_columns
+        f"{target}.{quote_identifier(column)} = {temp}.{quote_identifier(column)}" for column in key_columns
     )
     connection.register(temp_name, frame)
     try:

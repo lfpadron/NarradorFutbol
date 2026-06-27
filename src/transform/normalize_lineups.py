@@ -17,7 +17,9 @@ from src.transform.utils import (
 )
 
 
-def normalize_lineups_for_match(match_id: int, raw_lineups_dir: Path = RAW_LINEUPS_DIR) -> dict[str, list[dict[str, Any]]]:
+def normalize_lineups_for_match(
+    match_id: int, raw_lineups_dir: Path = RAW_LINEUPS_DIR
+) -> dict[str, list[dict[str, Any]]]:
     path = raw_lineups_dir / f"lineups.match-{match_id}.json"
     if not path.exists():
         return {"lineup": [], "team": [], "player": []}

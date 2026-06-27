@@ -12,7 +12,6 @@ import duckdb
 from src.config import SCOUTING_HISTORY_DB_PATH
 from src.ingestion.utils import to_jsonable
 
-
 SCOUTING_HISTORY_DB = SCOUTING_HISTORY_DB_PATH
 
 
@@ -119,9 +118,7 @@ def build_scouting_history_record(
         "player_id_b": scouting_result.get("player_id_b"),
         "player_name_b": summary.get("player_b"),
         "generated_at": (
-            save_result.get("exported_at_utc")
-            or save_result.get("exported_at")
-            or scouting_result.get("generated_at")
+            save_result.get("exported_at_utc") or save_result.get("exported_at") or scouting_result.get("generated_at")
         ),
         "generated_by": get_generated_by(),
         "use_api": use_api,

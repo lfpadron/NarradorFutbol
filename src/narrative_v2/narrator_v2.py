@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from openai import OpenAI, OpenAIError
@@ -326,9 +325,11 @@ def _dangerous_text(rows: list[dict[str, Any]]) -> str:
     for row in rows:
         team = str(row.get("team_name") or "Sin equipo")
         counts[team] = counts.get(team, 0) + 1
-    return "Ataques peligrosos en contexto reducido: " + ", ".join(
-        f"{team} {count}" for team, count in sorted(counts.items())
-    ) + "."
+    return (
+        "Ataques peligrosos en contexto reducido: "
+        + ", ".join(f"{team} {count}" for team, count in sorted(counts.items()))
+        + "."
+    )
 
 
 def _goal_moment(rows: list[dict[str, Any]]) -> dict[str, Any]:

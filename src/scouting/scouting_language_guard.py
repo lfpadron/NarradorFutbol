@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 
-
 PROBLEMATIC_PATTERNS: tuple[tuple[str, str], ...] = (
     (r"\bdestruy[oó]\b", "expresión agresiva: destruyó"),
     (r"\bdestroz[oó]\b", "expresión agresiva: destrozó"),

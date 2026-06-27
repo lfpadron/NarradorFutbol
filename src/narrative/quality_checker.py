@@ -27,7 +27,9 @@ def evaluate_narrative_quality(narrative: str, context: dict[str, Any]) -> dict[
         "marcador correcto": any(pattern in narrative for pattern in score_patterns),
         "equipos correctos": _contains_team(text, home) and _contains_team(text, away),
         "ganador correcto": not winner or _contains_team(text, winner),
-        "dominio del partido": _has_any(text, ("dominio", "domino", "dominante", "control territorial", "peso territorial")),
+        "dominio del partido": _has_any(
+            text, ("dominio", "domino", "dominante", "control territorial", "peso territorial")
+        ),
         "xG": "xg" in text,
         "jugador destacado": _mentions_any_player(text, context),
         "momentos clave": _has_any(text, ("momento clave", "minuto", "gol", "ocasion", "asistencia")),
@@ -162,4 +164,3 @@ def _coverage_warnings(missing_elements: list[str]) -> list[str]:
 
 def _clamp(value: int | float) -> int:
     return max(0, min(100, int(round(value))))
-

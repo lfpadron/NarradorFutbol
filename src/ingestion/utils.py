@@ -11,7 +11,6 @@ from typing import Any
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
-
 VALID_STATUSES = {
     "pending",
     "downloaded",
@@ -21,9 +20,7 @@ VALID_STATUSES = {
     "transformed",
 }
 
-OPEN_DATA_BASE_URL = (
-    "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
-)
+OPEN_DATA_BASE_URL = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 
 
 @dataclass(frozen=True)
@@ -147,9 +144,7 @@ def statsbomb_call(function_name: str, *args: Any, **kwargs: Any) -> Any:
     try:
         from statsbombpy import sb
     except ImportError as exc:
-        raise RuntimeError(
-            "statsbombpy is not installed. Run `pip install -r requirements.txt`."
-        ) from exc
+        raise RuntimeError("statsbombpy is not installed. Run `pip install -r requirements.txt`.") from exc
 
     func = getattr(sb, function_name)
     try:

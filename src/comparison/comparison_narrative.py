@@ -173,4 +173,3 @@ def _extract_response_text(response: Any) -> str:
         if chunks:
             return "\n".join(chunks)
     return str(response)
-

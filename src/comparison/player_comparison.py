@@ -76,8 +76,8 @@ def build_player_radar_metrics(comparison: dict[str, Any]) -> dict[str, Any]:
     raw_a = _radar_raw_scores(player_a)
     raw_b = _radar_raw_scores(player_b)
     categories = ["Ataque", "Creación", "Pase", "Progresión", "Presión", "Duelos", "Impacto"]
-    values_a = []
-    values_b = []
+    values_a: list[float] = []
+    values_b: list[float] = []
     for category in categories:
         score_a = _number(raw_a.get(category))
         score_b = _number(raw_b.get(category))
@@ -165,22 +165,11 @@ def _radar_raw_scores(player: dict[str, Any]) -> dict[str, float]:
     )
     return {
         "Ataque": (
-            _number(player.get("goals")) * 8
-            + _number(player.get("shots")) * 2
-            + _number(player.get("xg")) * 10
+            _number(player.get("goals")) * 8 + _number(player.get("shots")) * 2 + _number(player.get("xg")) * 10
         ),
-        "Creación": (
-            _number(player.get("assists")) * 8
-            + _number(player.get("key_passes")) * 3
-        ),
-        "Pase": (
-            _number(player.get("successful_passes")) * 0.35
-            + _number(player.get("pass_accuracy_pct")) * 0.65
-        ),
-        "Progresión": (
-            _number(player.get("progressive_passes")) * 4
-            + _number(player.get("carries")) * 0.8
-        ),
+        "Creación": (_number(player.get("assists")) * 8 + _number(player.get("key_passes")) * 3),
+        "Pase": (_number(player.get("successful_passes")) * 0.35 + _number(player.get("pass_accuracy_pct")) * 0.65),
+        "Progresión": (_number(player.get("progressive_passes")) * 4 + _number(player.get("carries")) * 0.8),
         "Presión": _number(player.get("pressures")),
         "Duelos": _number(player.get("duels")),
         "Impacto": impact_score if impact_score else fallback_impact,
@@ -202,8 +191,9 @@ def _find_impact_player(match_id: int, player_id: int) -> dict[str, Any] | None:
 
 
 def _extra_player_metrics(match_id: int, player_id: int) -> dict[str, Any]:
-    return query_one(
-        """
+    return (
+        query_one(
+            """
         WITH base_events AS (
             SELECT *
             FROM event
@@ -244,18 +234,16 @@ def _extra_player_metrics(match_id: int, player_id: int) -> dict[str, Any]:
             COALESCE((SELECT counterpressures FROM pressures), 0) AS counterpressures,
             (SELECT position_name FROM position) AS position_name
         """,
-        (match_id, player_id),
-    ) or {}
+            (match_id, player_id),
+        )
+        or {}
+    )
 
 
 def _player_key_moments(match_id: int, player_name: Any) -> list[dict[str, Any]]:
     if not player_name:
         return []
-    return [
-        moment
-        for moment in get_key_moments(match_id)
-        if moment.get("player_name") == player_name
-    ]
+    return [moment for moment in get_key_moments(match_id) if moment.get("player_name") == player_name]
 
 
 def _match_snapshot(label: str, summary: dict[str, Any]) -> dict[str, Any]:

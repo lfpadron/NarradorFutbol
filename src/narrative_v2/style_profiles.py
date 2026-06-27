@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 STYLE_PROFILES: dict[str, dict[str, Any]] = {
     "tactico": {
         "id": "tactico",
@@ -138,4 +137,3 @@ def get_style_profile(style_id: str) -> dict[str, Any]:
 
 def style_label_map() -> dict[str, str]:
     return {profile["name"]: style_id for style_id, profile in STYLE_PROFILES.items()}
-

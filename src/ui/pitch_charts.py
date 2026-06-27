@@ -8,18 +8,13 @@ from typing import Any
 import pandas as pd
 import plotly.graph_objects as go
 
-
 PITCH_LENGTH = 120
 PITCH_WIDTH = 80
 
 
 def plot_shot_map(shots: list[dict[str, Any]], home_team: str, away_team: str) -> go.Figure:
     figure = _pitch_figure("Mapa de tiros")
-    valid = [
-        shot
-        for shot in shots
-        if _valid_point(shot.get("location_x"), shot.get("location_y"))
-    ]
+    valid = [shot for shot in shots if _valid_point(shot.get("location_x"), shot.get("location_y"))]
     if not valid:
         return _annotate_empty(figure, "Sin tiros con coordenadas validas")
 
@@ -215,11 +210,7 @@ def plot_pressure_map(
 def plot_pass_network(pass_network: dict[str, Any]) -> go.Figure:
     team_name = pass_network.get("team_name") or "Equipo"
     figure = _pitch_figure(f"Red de pases - {team_name}")
-    nodes = [
-        node
-        for node in pass_network.get("nodes", [])
-        if _valid_point(node.get("avg_x"), node.get("avg_y"))
-    ]
+    nodes = [node for node in pass_network.get("nodes", []) if _valid_point(node.get("avg_x"), node.get("avg_y"))]
     if not nodes:
         return _annotate_empty(figure, "Sin nodos de pase con coordenadas")
 

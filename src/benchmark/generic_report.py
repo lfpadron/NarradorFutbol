@@ -85,4 +85,3 @@ def _conclusion(result: dict[str, Any]) -> str:
     if result.get("status") == "WARNING":
         return "La validación genérica terminó con advertencias revisables; el partido sigue siendo útil para análisis."
     return "La validación genérica detectó fallas que deben corregirse antes de usar este partido en demos."
-

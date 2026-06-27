@@ -5,6 +5,11 @@ __pycache__/
 .uv-cache/
 .tmp/
 
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
+
 data/raw/**
 !data/raw/
 !data/raw/.gitkeep
@@ -45,6 +50,9 @@ data/comparisons/*
 
 data/scouting/*
 !data/scouting/.gitkeep
+
+data/security/*
+!data/security/.gitkeep
 
 data/benchmarks/results/*
 !data/benchmarks/.gitkeep

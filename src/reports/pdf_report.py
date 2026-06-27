@@ -43,8 +43,7 @@ def render_pdf_report(html: str, output_path: str) -> dict[str, Any]:
         fallback_result = _render_reportlab_pdf(html, path)
         if fallback_result["status"] == "generated":
             fallback_result["warning_message"] = (
-                "WeasyPrint no esta disponible en este entorno; "
-                "se genero el PDF con el fallback ReportLab."
+                "WeasyPrint no esta disponible en este entorno; " "se genero el PDF con el fallback ReportLab."
             )
             fallback_result["weasyprint_error_message"] = str(weasyprint_exc)
             return fallback_result
@@ -52,10 +51,7 @@ def render_pdf_report(html: str, output_path: str) -> dict[str, Any]:
         return {
             "status": "failed",
             "path": path.as_posix(),
-            "error_message": (
-                f"WeasyPrint: {weasyprint_exc} | "
-                f"ReportLab: {fallback_result.get('error_message')}"
-            ),
+            "error_message": (f"WeasyPrint: {weasyprint_exc} | " f"ReportLab: {fallback_result.get('error_message')}"),
             "warning_message": None,
             "backend": None,
         }
@@ -66,7 +62,7 @@ def _render_reportlab_pdf(html: str, path: Path) -> dict[str, Any]:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
         path.parent.mkdir(parents=True, exist_ok=True)
         parser = _ReportHTMLParser()
@@ -151,10 +147,7 @@ def _render_reportlab_pdf(html: str, path: Path) -> dict[str, Any]:
         except PermissionError:
             written_path = _alternate_pdf_path(path)
             _write_reportlab_document(written_path, story, margin, letter, SimpleDocTemplate)
-            warning_message = (
-                f"No se pudo sobrescribir {path.name}; "
-                f"se genero {written_path.name}."
-            )
+            warning_message = f"No se pudo sobrescribir {path.name}; " f"se genero {written_path.name}."
 
         return {
             "status": "generated",

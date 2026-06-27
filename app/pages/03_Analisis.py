@@ -56,6 +56,7 @@ from src.scouting.scouting_narrator import generate_scouting_narrative
 from src.scouting.scouting_report import save_scouting_report
 from src.scouting.scouting_v2 import generate_scouting_v2
 from src.scouting.scouting_v2_report import save_scouting_v2_report
+from src.security.streamlit_auth import require_login
 from src.ui.charts import momentum_line, shot_count_bar, xg_bar
 from src.ui.formatters import format_float, format_pct, format_score
 from src.ui.pitch_charts import (
@@ -66,21 +67,19 @@ from src.ui.pitch_charts import (
     plot_shot_map,
 )
 
-
 st.set_page_config(page_title="Análisis", layout="wide")
+require_login()
 st.title("Análisis")
 
 
 @st.cache_data(show_spinner=False)
 def load_match_options() -> pd.DataFrame:
-    return query_df(
-        """
+    return query_df("""
         SELECT match_id, match_date, home_team_name, away_team_name, home_score, away_score
         FROM vw_match_summary
         WHERE total_events > 0
         ORDER BY match_date, match_id
-        """
-    )
+        """)
 
 
 @st.cache_data(show_spinner=False)
@@ -129,7 +128,9 @@ if matches.empty:
     st.stop()
 
 options = {
-    f"{row.match_id} | {row.match_date} | {row.home_team_name} {row.home_score}-{row.away_score} {row.away_team_name}": int(row.match_id)
+    f"{row.match_id} | {row.match_date} | {row.home_team_name} {row.home_score}-{row.away_score} {row.away_team_name}": int(
+        row.match_id
+    )
     for row in matches.itertuples(index=False)
 }
 selected_label = st.selectbox("Partido", list(options.keys()))
@@ -265,10 +266,7 @@ with tabs[3]:
 
 with tabs[4]:
     st.subheader("Momentum")
-    st.write(
-        "Fórmula MVP: tiros * 3 + xG * 10 + entradas al tercio final * 1 "
-        "+ eventos ofensivos * 0.5."
-    )
+    st.write("Fórmula MVP: tiros * 3 + xG * 10 + entradas al tercio final * 1 " "+ eventos ofensivos * 0.5.")
     momentum = detail["momentum"]
     st.plotly_chart(momentum_line(momentum), width="stretch")
     st.dataframe(pd.DataFrame(momentum), width="stretch")
@@ -594,9 +592,7 @@ with tabs[7]:
     if not api_key_available_v2:
         st.warning("OPENAI_API_KEY no está configurada. Narrador AI v2 usará fallback local.")
 
-    st.caption(
-        f"Audiencia: {selected_profile['audience']} | Objetivo: {selected_profile['objective']}"
-    )
+    st.caption(f"Audiencia: {selected_profile['audience']} | Objetivo: {selected_profile['objective']}")
 
     v2_result_key = f"narrative_v2_result_{match_id}_{selected_style_id}"
     v2_comparison_key = f"narrative_v2_comparison_{match_id}"
@@ -666,7 +662,9 @@ with tabs[7]:
 
 with tabs[8]:
     st.subheader("Benchmark")
-    st.write("Validación futbolística y regresión narrativa, con rutas separadas para casos curados y partidos genéricos.")
+    st.write(
+        "Validación futbolística y regresión narrativa, con rutas separadas para casos curados y partidos genéricos."
+    )
 
     st.markdown("### Benchmark curado")
     st.caption("Usa expectativas humanas conocidas; sirve para regresión narrativa y demos históricas controladas.")
@@ -740,11 +738,7 @@ with tabs[8]:
                     ]
                 )
                 st.dataframe(checks_frame, width="stretch")
-                warnings = [
-                    check
-                    for check in case_result.get("checks", [])
-                    if check.get("status") != "PASS"
-                ]
+                warnings = [check for check in case_result.get("checks", []) if check.get("status") != "PASS"]
                 if warnings:
                     st.warning("Advertencias o fallos detectados")
                     for warning in warnings:
@@ -832,11 +826,7 @@ with tabs[9]:
     match_labels = list(options.keys())
     default_a_index = next((idx for idx, label in enumerate(match_labels) if options[label] == 7534), 0)
     default_b_index = next(
-        (
-            idx
-            for idx, label in enumerate(match_labels)
-            if options[label] != options[match_labels[default_a_index]]
-        ),
+        (idx for idx, label in enumerate(match_labels) if options[label] != options[match_labels[default_a_index]]),
         0,
     )
     selector_cols = st.columns(2)
@@ -1017,7 +1007,9 @@ with tabs[9]:
 
 with tabs[10]:
     st.subheader("Comparador de jugadores")
-    st.write("Compara jugadores dentro del mismo partido o entre partidos distintos con lectura estadística y contextual.")
+    st.write(
+        "Compara jugadores dentro del mismo partido o entre partidos distintos con lectura estadística y contextual."
+    )
 
     player_match_labels = list(options.keys())
     player_default_a_index = next((idx for idx, label in enumerate(player_match_labels) if options[label] == 7534), 0)
@@ -1081,7 +1073,9 @@ with tabs[10]:
         player_id_a = player_options_a[selected_player_label_a]
         player_id_b = player_options_b[selected_player_label_b]
         player_comparison_key = f"player_comparison_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
-        player_narrative_key = f"player_comparison_narrative_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+        player_narrative_key = (
+            f"player_comparison_narrative_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+        )
 
         player_action_cols = st.columns(3)
         if player_action_cols[0].button("Comparar jugadores"):
@@ -1404,7 +1398,9 @@ with tabs[11]:
         st.warning("No hay jugadores transformados para el Partido A.")
     else:
         v2_player_options_a = {
-            f"{row.get('player_name')} | {row.get('team_name')} | eventos {row.get('events')} | id {row.get('player_id')}": int(row["player_id"])
+            f"{row.get('player_name')} | {row.get('team_name')} | eventos {row.get('events')} | id {row.get('player_id')}": int(
+                row["player_id"]
+            )
             for row in v2_players_a
         }
         v2_default_player_a = next(
@@ -1434,7 +1430,9 @@ with tabs[11]:
                 st.warning("No hay jugadores transformados para el Partido B.")
             else:
                 v2_player_options_b = {
-                    f"{row.get('player_name')} | {row.get('team_name')} | eventos {row.get('events')} | id {row.get('player_id')}": int(row["player_id"])
+                    f"{row.get('player_name')} | {row.get('team_name')} | eventos {row.get('events')} | id {row.get('player_id')}": int(
+                        row["player_id"]
+                    )
                     for row in v2_players_b
                 }
                 v2_default_player_b = next(

@@ -97,4 +97,3 @@ def _html_title(report: dict) -> str:
         f"{summary.get('home_score', '')}-{summary.get('away_score', '')} "
         f"{summary.get('away_team_name', '')}"
     ).strip()
-

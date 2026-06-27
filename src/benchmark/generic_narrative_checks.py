@@ -44,4 +44,3 @@ def validate_narratives_for_any_match(match_id: int, use_api: bool = False) -> d
             ],
         },
     }
-

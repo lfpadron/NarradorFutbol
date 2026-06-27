@@ -22,9 +22,7 @@ from src.ingestion.utils import as_int
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Download StatsBomb Open Data raw JSON and update ingestion log."
-    )
+    parser = argparse.ArgumentParser(description="Download StatsBomb Open Data raw JSON and update ingestion log.")
     parser.add_argument(
         "--limit",
         type=int,
@@ -102,19 +100,11 @@ def main() -> None:
 
         if args.retry_failed:
             failed_ids = ingestion_log.failed_match_ids()
-            match_records = [
-                record
-                for record in match_records
-                if as_int(record.get("match_id")) in failed_ids
-            ]
+            match_records = [record for record in match_records if as_int(record.get("match_id")) in failed_ids]
             print(f"retry_failed matches: {len(match_records)}")
 
         if args.match_id is not None:
-            match_records = [
-                record
-                for record in match_records
-                if as_int(record.get("match_id")) == args.match_id
-            ]
+            match_records = [record for record in match_records if as_int(record.get("match_id")) == args.match_id]
             if not match_records:
                 raise SystemExit(f"match_id={args.match_id} not found in all_matches index.")
             print(f"selected match_id: {args.match_id}")

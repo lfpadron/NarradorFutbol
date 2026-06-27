@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 BENCHMARK_CASES: list[dict[str, Any]] = [
     {
         "case_id": "germany_mexico_2018",

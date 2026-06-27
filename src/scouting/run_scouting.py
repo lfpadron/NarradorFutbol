@@ -31,7 +31,9 @@ def parse_args() -> argparse.Namespace:
     individual = args.match_id is not None or args.player_id is not None
     comparative = any(value is not None for value in (args.match_a, args.player_a, args.match_b, args.player_b))
     if individual and comparative:
-        parser.error("Usa modo individual (--match-id/--player-id) o comparativo (--match-a/--player-a/--match-b/--player-b), no ambos.")
+        parser.error(
+            "Usa modo individual (--match-id/--player-id) o comparativo (--match-a/--player-a/--match-b/--player-b), no ambos."
+        )
     if individual:
         if args.match_id is None or args.player_id is None:
             parser.error("El modo individual requiere --match-id y --player-id.")

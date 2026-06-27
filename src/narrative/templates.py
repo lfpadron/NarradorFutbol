@@ -92,10 +92,7 @@ def _format_key_moments(key_moments: list[dict[str, Any]], limit: int = 6) -> st
         return "No se detectaron momentos clave."
     lines = []
     for moment in key_moments[:limit]:
-        lines.append(
-            f"- Minuto {moment.get('minute')}: {moment.get('title')} "
-            f"({moment.get('type')})."
-        )
+        lines.append(f"- Minuto {moment.get('minute')}: {moment.get('title')} " f"({moment.get('type')}).")
     return "\n".join(lines)
 
 

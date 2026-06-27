@@ -11,7 +11,6 @@ from src.benchmark.generic_narrative_checks import validate_narratives_for_any_m
 from src.ingestion.utils import to_jsonable
 from src.reports.report_builder import build_match_report
 
-
 Check = dict[str, Any]
 
 
@@ -63,7 +62,7 @@ def validate_any_match(match_id: int, use_api: bool = False) -> dict[str, Any]:
     checks.append(_safe_check(check_dominance, match_id, summary, context))
     checks.append(_safe_check(check_report_generation, match_id, summary, context, use_api))
 
-    narrative_result = {"basic": {}, "v2": {}}
+    narrative_result: dict[str, Any] = {"basic": {}, "v2": {}}
     try:
         narrative_result = validate_narratives_for_any_match(match_id, use_api=use_api)
         checks.extend(_narrative_checks(narrative_result))
@@ -77,11 +76,7 @@ def validate_any_match(match_id: int, use_api: bool = False) -> dict[str, Any]:
             )
         )
 
-    warnings = [
-        f"{check['check_name']}: {check['message']}"
-        for check in checks
-        if check.get("status") != "PASS"
-    ]
+    warnings = [f"{check['check_name']}: {check['message']}" for check in checks if check.get("status") != "PASS"]
 
     return to_jsonable(
         {
@@ -238,11 +233,7 @@ def check_players(match_id: int, summary: dict[str, Any], context: dict[str, Any
     null_player_events = int(stats.get("null_player_events") or 0)
     unnamed = int(stats.get("unnamed_player_events") or 0)
     null_ratio = (null_player_events / total) if total else 1
-    missing_relevant_names = [
-        row
-        for row in context.get("impact_players", [])
-        if not row.get("player_name")
-    ]
+    missing_relevant_names = [row for row in context.get("impact_players", []) if not row.get("player_name")]
     if unnamed or missing_relevant_names:
         status = "WARNING"
         message = "Hay jugadores relevantes o eventos con jugador sin nombre."
@@ -299,7 +290,11 @@ def _narrative_checks(narrative_result: dict[str, Any]) -> list[Check]:
         _check_result(
             "check_basic_narrative",
             "PASS" if not basic_fact_warnings and int(basic_quality.get("overall_score") or 0) >= 70 else "WARNING",
-            "La narrativa básica respeta marcador y equipos." if not basic_fact_warnings else "La narrativa básica tiene advertencias factuales.",
+            (
+                "La narrativa básica respeta marcador y equipos."
+                if not basic_fact_warnings
+                else "La narrativa básica tiene advertencias factuales."
+            ),
             {
                 "fact_warnings": basic_fact_warnings,
                 "quality_overall_score": basic_quality.get("overall_score"),
@@ -308,7 +303,11 @@ def _narrative_checks(narrative_result: dict[str, Any]) -> list[Check]:
         _check_result(
             "check_v2_narrative",
             "PASS" if v2_styles_checked and v2_fact_warnings_total == 0 else "WARNING",
-            "Narrador AI v2 respeta marcador y equipos." if v2_fact_warnings_total == 0 else "Narrador AI v2 tiene advertencias factuales.",
+            (
+                "Narrador AI v2 respeta marcador y equipos."
+                if v2_fact_warnings_total == 0
+                else "Narrador AI v2 tiene advertencias factuales."
+            ),
             {
                 "styles_checked": v2_styles_checked,
                 "fact_warnings_total": v2_fact_warnings_total,
@@ -383,4 +382,3 @@ def _overall_status(checks: list[Check]) -> str:
     if "WARNING" in statuses:
         return "WARNING"
     return "PASS"
-

@@ -283,7 +283,7 @@ def render_scouting_docx(result: dict[str, Any], markdown_text: str, output_path
             title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        document.save(path)
+        document.save(str(path))
         return {"status": "generated", "path": path.as_posix(), "error_message": None}
     except Exception as exc:
         return {"status": "failed", "path": path.as_posix(), "error_message": str(exc)}

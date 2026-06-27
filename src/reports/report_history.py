@@ -11,7 +11,6 @@ import duckdb
 from src.config import REPORT_HISTORY_DB_PATH
 from src.ingestion.utils import to_jsonable
 
-
 REPORT_HISTORY_DB = REPORT_HISTORY_DB_PATH
 
 
@@ -119,9 +118,7 @@ def build_history_record(
         "match_id": report.get("match_id"),
         "tone": report.get("tone"),
         "generated_at": (
-            save_result.get("exported_at_utc")
-            or save_result.get("exported_at")
-            or report.get("generated_at")
+            save_result.get("exported_at_utc") or save_result.get("exported_at") or report.get("generated_at")
         ),
         "generated_by": get_generated_by(),
         "use_api": use_api,
@@ -164,9 +161,7 @@ def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
         "docx_status": record.get("docx_status") or "not_requested",
         "warnings_count": int(record.get("warnings_count") or 0),
         "quality_overall_score": (
-            int(record["quality_overall_score"])
-            if record.get("quality_overall_score") is not None
-            else None
+            int(record["quality_overall_score"]) if record.get("quality_overall_score") is not None else None
         ),
         "error_message": record.get("error_message"),
     }

@@ -191,4 +191,3 @@ def _claim_present(claim: str, normalized_text: str) -> bool:
         "penalty shootout": ("penalty shootout", "tanda de penales", "penaltis"),
     }
     return any(pattern in normalized_text for pattern in semantic_claims.get(claim_norm, (claim_norm,)))
-

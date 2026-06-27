@@ -9,7 +9,9 @@ from src.config import RAW_THREE_SIXTY_DIR
 from src.transform.utils import THREE_SIXTY_FILE_RE, as_str, json_text, load_records, match_id_from_path
 
 
-def normalize_360_for_match(match_id: int, raw_three_sixty_dir: Path = RAW_THREE_SIXTY_DIR) -> dict[str, list[dict[str, Any]]]:
+def normalize_360_for_match(
+    match_id: int, raw_three_sixty_dir: Path = RAW_THREE_SIXTY_DIR
+) -> dict[str, list[dict[str, Any]]]:
     path = raw_three_sixty_dir / f"three-sixty.match-{match_id}.json"
     if not path.exists():
         return {"visible_area": []}

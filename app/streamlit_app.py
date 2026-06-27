@@ -4,9 +4,10 @@ import duckdb
 import streamlit as st
 
 from src.config import ANALYTICS_DB
-
+from src.security.streamlit_auth import require_login
 
 st.set_page_config(page_title="Narrador Inteligente de Futbol", layout="wide")
+require_login()
 
 
 @st.cache_data(show_spinner=False)

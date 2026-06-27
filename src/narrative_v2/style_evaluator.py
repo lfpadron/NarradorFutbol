@@ -14,11 +14,7 @@ def evaluate_style_fit(narrative: str, style_id: str, context: dict[str, Any]) -
     profile = get_style_profile(style_id)
     normalized = _normalize(narrative)
     words = re.findall(r"\w+", normalized)
-    missing_sections = [
-        section
-        for section in profile["expected_sections"]
-        if _normalize(section) not in normalized
-    ]
+    missing_sections = [section for section in profile["expected_sections"] if _normalize(section) not in normalized]
     structure_score = max(0, 100 - len(missing_sections) * 16)
     audience_fit_score = _audience_fit_score(style_id, normalized)
     length_score = _length_score(len(words), profile["min_words"], profile["max_words"])

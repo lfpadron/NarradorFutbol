@@ -28,14 +28,16 @@ def generate_scouting_v2(
         language_warnings.append("Se ajustó lenguaje no profesional antes de entregar el reporte.")
     narrative = clean_narrative
     residual_language_warnings = validate_scouting_language(narrative)
-    language_warnings.extend(
-        warning for warning in residual_language_warnings if warning not in language_warnings
-    )
+    language_warnings.extend(warning for warning in residual_language_warnings if warning not in language_warnings)
 
     warnings = list(profile_a.get("warnings", []))
     if profile_b:
         warnings.extend(profile_b.get("warnings", []))
-        if profile_a.get("position_name") and profile_b.get("position_name") and profile_a.get("position_name") != profile_b.get("position_name"):
+        if (
+            profile_a.get("position_name")
+            and profile_b.get("position_name")
+            and profile_a.get("position_name") != profile_b.get("position_name")
+        ):
             warnings.append(
                 f"Roles observados distintos: {profile_a.get('position_name')} vs {profile_b.get('position_name')}; la comparación debe leerse con cautela."
             )
@@ -156,7 +158,9 @@ def _compare_profiles(profile_a: dict[str, Any], profile_b: dict[str, Any]) -> d
 
     complementarity = []
     if profile_a.get("archetype") != profile_b.get("archetype"):
-        complementarity.append("Perfiles distintos: pueden ser más útiles como roles complementarios que como ranking directo.")
+        complementarity.append(
+            "Perfiles distintos: pueden ser más útiles como roles complementarios que como ranking directo."
+        )
     attack_a = _number(profile_a.get("attack_profile", {}).get("score"))
     attack_b = _number(profile_b.get("attack_profile", {}).get("score"))
     organization_a = max(

@@ -1,2 +1,1 @@
 """Narrative generation layer."""
-

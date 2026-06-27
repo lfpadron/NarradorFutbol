@@ -75,9 +75,7 @@ def main() -> None:
             include_pdf=args.pdf,
             include_docx=args.docx,
         )
-        record_report_generation(
-            build_history_record(report, paths, use_api=not args.no_api)
-        )
+        record_report_generation(build_history_record(report, paths, use_api=not args.no_api))
         print("\nRutas guardadas")
         for label in ("markdown", "html", "json", "pdf", "docx"):
             path = paths.get(label)
@@ -101,8 +99,7 @@ def print_history(rows: list[dict]) -> None:
         return
     print("Report history")
     print(
-        "generated_at | match_id | tone | generated_by | status | "
-        "pdf_status | docx_status | quality | markdown_path"
+        "generated_at | match_id | tone | generated_by | status | " "pdf_status | docx_status | quality | markdown_path"
     )
     for row in rows:
         print(

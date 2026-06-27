@@ -7,7 +7,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 load_dotenv(PROJECT_ROOT / ".env")
@@ -31,6 +30,7 @@ COMPARISONS_DIR = DATA_DIR / "comparisons"
 SCOUTING_DIR = DATA_DIR / "scouting"
 BENCHMARKS_DIR = DATA_DIR / "benchmarks"
 BENCHMARK_RESULTS_DIR = BENCHMARKS_DIR / "results"
+SECURITY_DIR = DATA_DIR / "security"
 
 RAW_COMPETITIONS_DIR = RAW_DIR / "competitions"
 RAW_MATCHES_DIR = RAW_DIR / "matches"
@@ -45,6 +45,7 @@ INGESTION_LOG_DB = METADATA_DIR / "ingestion_log.duckdb"
 ANALYTICS_DB = ANALYTICS_DIR / "statsbomb.duckdb"
 REPORT_HISTORY_DB_PATH = ANALYTICS_DIR / "report_history.duckdb"
 SCOUTING_HISTORY_DB_PATH = ANALYTICS_DIR / "scouting_history.duckdb"
+SECURITY_DB_PATH = SECURITY_DIR / "security.sqlite"
 
 RAW_DIRECTORIES = (
     RAW_COMPETITIONS_DIR,
@@ -68,6 +69,7 @@ def ensure_directories() -> None:
         SCOUTING_DIR,
         BENCHMARKS_DIR,
         BENCHMARK_RESULTS_DIR,
+        SECURITY_DIR,
     ):
         directory.mkdir(parents=True, exist_ok=True)
 

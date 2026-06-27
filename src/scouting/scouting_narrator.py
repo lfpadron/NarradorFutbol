@@ -57,9 +57,7 @@ def generate_scouting_narrative(
         language_warnings.append("Se ajustó lenguaje no profesional antes de entregar el reporte.")
     narrative_markdown = clean_markdown
     residual_language_warnings = validate_scouting_language(narrative_markdown)
-    language_warnings.extend(
-        warning for warning in residual_language_warnings if warning not in language_warnings
-    )
+    language_warnings.extend(warning for warning in residual_language_warnings if warning not in language_warnings)
 
     reported_model = model if status == "generated" else "local-scouting-fallback"
 
@@ -151,7 +149,9 @@ Fortalezas de Jugador B: {_list_text(strengths.get('player_b_strengths', []))}. 
 def _profile_text(player: dict[str, Any], radar: dict[str, Any]) -> str:
     values = radar.get("player_a", {}).get("values", [])
     categories = radar.get("categories", [])
-    radar_text = ", ".join(f"{category} {value}" for category, value in zip(categories, values)) or "radar no disponible"
+    radar_text = (
+        ", ".join(f"{category} {value}" for category, value in zip(categories, values)) or "radar no disponible"
+    )
     return (
         f"Registró {player.get('events')} eventos, {player.get('shots')} tiros, {player.get('goals')} goles, "
         f"{player.get('xg')} xG, {player.get('assists')} asistencias, {player.get('key_passes')} pases clave, "

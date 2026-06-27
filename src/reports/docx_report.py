@@ -44,7 +44,7 @@ def render_docx_report(report: dict[str, Any], output_path: str) -> dict[str, An
         _add_traceability(document, report)
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        document.save(path)
+        document.save(str(path))
         return {
             "status": "generated",
             "path": path.as_posix(),
@@ -94,7 +94,9 @@ def _add_team_stats(document: Any, report: dict[str, Any]) -> None:
     team_stats = analytics.get("team_stats", [])
     dangerous_counts = _dangerous_counts(analytics.get("dangerous_attacks", []))
     possession_summary = analytics.get("possession_summary", {})
-    possessions_by_team = possession_summary.get("possessions_by_team", {}) if isinstance(possession_summary, dict) else {}
+    possessions_by_team = (
+        possession_summary.get("possessions_by_team", {}) if isinstance(possession_summary, dict) else {}
+    )
     document.add_heading("Estadísticas principales", level=1)
     rows = []
     for team in team_stats:
@@ -288,4 +290,3 @@ def _strip_markdown(value: str) -> str:
     clean = clean.replace("**", "")
     clean = clean.replace("`", "")
     return clean
-

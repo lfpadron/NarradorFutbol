@@ -5,8 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from src.scouting.scouting_exporter import (
-    render_scouting_html,
-    render_scouting_markdown,
     save_scouting_export,
 )
 

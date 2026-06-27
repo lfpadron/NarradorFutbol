@@ -44,8 +44,7 @@ def main() -> None:
 
 
 def print_matches() -> None:
-    rows = query_records(
-        """
+    rows = query_records("""
         SELECT
             match_id,
             match_date,
@@ -59,8 +58,7 @@ def print_matches() -> None:
         FROM vw_match_summary
         WHERE total_events > 0
         ORDER BY match_date, match_id
-        """
-    )
+        """)
     if not rows:
         print("No transformed matches found. Run `uv run python -m src.transform.build_duckdb --limit 3 --force`.")
         return

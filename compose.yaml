@@ -1,0 +1,31 @@
+services:
+  narrador-futbol:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: narrador-futbol:v01
+    ports:
+      - "8501:8501"
+    environment:
+      NARRADOR_DATA_DIR: /app/data
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-dev-secret-change-me}
+      SEED_ADMIN_EMAIL_1: ${SEED_ADMIN_EMAIL_1:-admin1@example.com}
+      SEED_ADMIN_EMAIL_2: ${SEED_ADMIN_EMAIL_2:-admin2@example.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-ChangeMe-v01!}
+      INVITATION_TTL_HOURS: ${INVITATION_TTL_HOURS:-72}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      NARRADOR_USER_EMAIL: ${NARRADOR_USER_EMAIL:-local_user}
+      PYTHONPATH: /app
+      STREAMLIT_SERVER_ADDRESS: 0.0.0.0
+      STREAMLIT_SERVER_PORT: "8501"
+      STREAMLIT_SERVER_HEADLESS: "true"
+    volumes:
+      - ./data:/app/data
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./data/reports:/app/data/reports
+      - ./data/scouting:/app/data/scouting
+      - ./data/analytics:/app/data/analytics
+      - ./data/security:/app/data/security
+    restart: unless-stopped

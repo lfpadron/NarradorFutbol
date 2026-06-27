@@ -8,7 +8,6 @@ from typing import Any
 from src.ingestion.utils import to_jsonable
 from src.narrative_v2.style_profiles import get_style_profile
 
-
 COMMON_RULES = [
     "No inventar marcador, goles, jugadores, tarjetas ni eventos.",
     "Usar solo el contexto analitico entregado.",
@@ -62,4 +61,3 @@ Contexto analitico reducido:
 
 Devuelve solo Markdown listo para leerse o publicarse.
 """
-

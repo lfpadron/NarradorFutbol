@@ -8,7 +8,6 @@ from src.comparison.player_comparison import compare_players
 from src.ingestion.utils import to_jsonable
 from src.scouting.player_archetypes import ARCHETYPES, PlayerArchetype
 
-
 NORMALIZATION_CAPS: dict[str, float] = {
     "xg": 0.7,
     "shots": 6,
@@ -73,7 +72,7 @@ def _normalized_metrics(player: dict[str, Any]) -> dict[str, float]:
 
 
 def _score_archetypes(normalized: dict[str, float], position_name: str) -> list[dict[str, Any]]:
-    scores = []
+    scores: list[dict[str, Any]] = []
     for archetype in ARCHETYPES:
         weighted = sum(normalized.get(metric, 0.0) * weight for metric, weight in archetype.weights.items())
         bonus = _position_bonus(archetype, position_name)
@@ -90,7 +89,7 @@ def _score_archetypes(normalized: dict[str, float], position_name: str) -> list[
                 "position_adjustment": adjustment,
             }
         )
-    scores.sort(key=lambda item: item["score"], reverse=True)
+    scores.sort(key=lambda item: float(item["score"]), reverse=True)
     return scores
 
 
@@ -126,7 +125,9 @@ def _attack_profile(player: dict[str, Any], normalized: dict[str, float]) -> dic
 
 
 def _creation_profile(player: dict[str, Any], normalized: dict[str, float]) -> dict[str, Any]:
-    score = _weighted_average(normalized, {"key_passes": 0.45, "assists": 0.25, "pass_accuracy_pct": 0.15, "progressive_passes": 0.15})
+    score = _weighted_average(
+        normalized, {"key_passes": 0.45, "assists": 0.25, "pass_accuracy_pct": 0.15, "progressive_passes": 0.15}
+    )
     return {
         "score": score,
         "label": _label(score),
@@ -137,7 +138,9 @@ def _creation_profile(player: dict[str, Any], normalized: dict[str, float]) -> d
 
 
 def _progression_profile(player: dict[str, Any], normalized: dict[str, float]) -> dict[str, Any]:
-    score = _weighted_average(normalized, {"progressive_passes": 0.35, "carries": 0.3, "carry_distance": 0.25, "passes": 0.1})
+    score = _weighted_average(
+        normalized, {"progressive_passes": 0.35, "carries": 0.3, "carry_distance": 0.25, "passes": 0.1}
+    )
     return {
         "score": score,
         "label": _label(score),
@@ -174,8 +177,14 @@ def _strengths(normalized: dict[str, float], player: dict[str, Any]) -> list[str
     candidates = [
         ("Definición e incidencia ofensiva", max(normalized["goals"], normalized["xg"], normalized["shots"])),
         ("Creación de ventaja", max(normalized["key_passes"], normalized["assists"])),
-        ("Volumen de pase y organización", max(normalized["passes"], normalized["successful_passes"], normalized["events"])),
-        ("Progresión con pase o conducción", max(normalized["progressive_passes"], normalized["carries"], normalized["carry_distance"])),
+        (
+            "Volumen de pase y organización",
+            max(normalized["passes"], normalized["successful_passes"], normalized["events"]),
+        ),
+        (
+            "Progresión con pase o conducción",
+            max(normalized["progressive_passes"], normalized["carries"], normalized["carry_distance"]),
+        ),
         ("Presión y actividad sin balón", max(normalized["pressures"], normalized["counterpressures"])),
         ("Impacto observable", normalized["impact_score"]),
     ]
@@ -192,8 +201,14 @@ def _weaknesses(normalized: dict[str, float]) -> list[str]:
     candidates = [
         ("Amenaza de remate limitada en este partido", max(normalized["xg"], normalized["shots"], normalized["goals"])),
         ("Creación directa limitada", max(normalized["key_passes"], normalized["assists"])),
-        ("Progresión limitada", max(normalized["progressive_passes"], normalized["carries"], normalized["carry_distance"])),
-        ("Participación defensiva baja", max(normalized["pressures"], normalized["duels"], normalized["counterpressures"])),
+        (
+            "Progresión limitada",
+            max(normalized["progressive_passes"], normalized["carries"], normalized["carry_distance"]),
+        ),
+        (
+            "Participación defensiva baja",
+            max(normalized["pressures"], normalized["duels"], normalized["counterpressures"]),
+        ),
     ]
     for label, score in candidates:
         if score <= 30:

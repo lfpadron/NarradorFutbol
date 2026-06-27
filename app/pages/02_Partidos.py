@@ -4,17 +4,17 @@ import pandas as pd
 import streamlit as st
 
 from src.analytics.db import AnalyticsDatabaseError, query_df
+from src.security.streamlit_auth import require_login
 from src.ui.formatters import format_float, format_score
 
-
 st.set_page_config(page_title="Partidos", layout="wide")
+require_login()
 st.title("Partidos")
 
 
 @st.cache_data(show_spinner=False)
 def load_matches() -> pd.DataFrame:
-    return query_df(
-        """
+    return query_df("""
         SELECT
             m.match_id,
             m.competition_id,
@@ -37,8 +37,7 @@ def load_matches() -> pd.DataFrame:
         LEFT JOIN season s ON s.season_id = m.season_id AND s.competition_id = m.competition_id
         WHERE v.total_events > 0
         ORDER BY m.match_date, m.match_id
-        """
-    )
+        """)
 
 
 try:
@@ -66,10 +65,7 @@ if selected_competition != "Todas":
 if selected_season != "Todas":
     filtered = filtered[filtered["season_name"] == selected_season]
 if selected_team != "Todos":
-    filtered = filtered[
-        (filtered["home_team_name"] == selected_team)
-        | (filtered["away_team_name"] == selected_team)
-    ]
+    filtered = filtered[(filtered["home_team_name"] == selected_team) | (filtered["away_team_name"] == selected_team)]
 if selected_date:
     filtered = filtered[filtered["match_date"].astype(str).str.contains(selected_date, case=False, na=False)]
 
@@ -80,7 +76,9 @@ if filtered.empty:
     st.stop()
 
 options = {
-    f"{row.match_id} | {row.match_date} | {row.home_team_name} {row.home_score}-{row.away_score} {row.away_team_name}": int(row.match_id)
+    f"{row.match_id} | {row.match_date} | {row.home_team_name} {row.home_score}-{row.away_score} {row.away_team_name}": int(
+        row.match_id
+    )
     for row in filtered.itertuples(index=False)
 }
 selected_label = st.selectbox("Seleccionar partido", list(options.keys()))
@@ -91,7 +89,9 @@ st.subheader("Resumen")
 metric_cols = st.columns(5)
 metric_cols[0].metric("match_id", int(row["match_id"]))
 metric_cols[1].metric("Fecha", row["match_date"])
-metric_cols[2].metric("Marcador", format_score(row["home_team_name"], row["home_score"], row["away_score"], row["away_team_name"]))
+metric_cols[2].metric(
+    "Marcador", format_score(row["home_team_name"], row["home_score"], row["away_score"], row["away_team_name"])
+)
 metric_cols[3].metric("Eventos", int(row["total_events"]))
 metric_cols[4].metric("xG total", format_float(row["total_xg"]))
 

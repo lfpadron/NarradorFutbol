@@ -25,7 +25,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--player-b", type=int, help="Player ID del Jugador B.")
     parser.add_argument("--narrative", action="store_true", help="Genera narrativa comparativa.")
     parser.add_argument("--save", action="store_true", help="Guarda comparación en JSON y Markdown.")
-    parser.add_argument("--export-visual-data", action="store_true", help="Guarda datos visuales para radar y fortalezas.")
+    parser.add_argument(
+        "--export-visual-data", action="store_true", help="Guarda datos visuales para radar y fortalezas."
+    )
     parser.add_argument("--no-api", action="store_true", help="Desactiva OpenAI API para la narrativa.")
     args = parser.parse_args()
 
