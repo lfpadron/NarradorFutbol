@@ -67,6 +67,7 @@ from src.scouting.scouting_v2 import generate_scouting_v2
 from src.scouting.scouting_v2_report import save_scouting_v2_report
 from src.security.streamlit_auth import require_login
 from src.ui.charts import momentum_line, shots_on_target_bar, xg_bar
+from src.ui.downloads import render_download_button, render_export_downloads
 from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_pct, format_score
 from src.ui.pitch_charts import (
@@ -141,11 +142,18 @@ def render_tab_pdf_button(
     key: str | None = None,
     disabled: bool = False,
 ) -> None:
-    if not st.button("Exportar PDF de esta pestaña", key=key or f"export_pdf_{tab_name}_{match_id}", disabled=disabled):
+    button_key = key or f"export_pdf_{tab_name}_{match_id}"
+    result_key = f"{button_key}_result"
+    if st.button("Exportar PDF de esta pestaña", key=button_key, disabled=disabled):
+        st.session_state[result_key] = save_analysis_tab_pdf(tab_name, match_id, title, sections, figures)
+
+    result = st.session_state.get(result_key)
+    if not result:
         return
-    result = save_analysis_tab_pdf(tab_name, match_id, title, sections, figures)
+
     if result.get("status") == "generated":
         st.success(f"PDF exportado: `{result.get('path')}`")
+        render_download_button(result.get("path"), "PDF", f"{button_key}_download")
     else:
         st.error(f"No se pudo exportar PDF: {result.get('error_message')}")
     warnings = result.get("warnings") or []
@@ -472,6 +480,8 @@ with tabs[6]:
     quality_key = f"narrative_quality_{match_id}_{selected_tone}"
     comparison_key = f"tone_comparison_{match_id}"
     review_key = f"review_report_{match_id}"
+    narrative_paths_key = f"narrative_paths_{match_id}_{selected_tone}"
+    review_paths_key = f"review_paths_{match_id}"
     final_report_key = f"final_report_{match_id}_{selected_tone}"
     final_report_paths_key = f"final_report_paths_{match_id}_{selected_tone}"
     action_cols = st.columns(2)
@@ -482,11 +492,13 @@ with tabs[6]:
                 selected_tone,
                 use_api=use_api,
             )
+            st.session_state.pop(narrative_paths_key, None)
 
     current_result = st.session_state.get(result_key)
     if action_cols[1].button("Guardar narración", disabled=current_result is None):
         if current_result:
             md_path, json_path = save_narrative(current_result)
+            st.session_state[narrative_paths_key] = {"markdown": md_path, "json": json_path}
             st.success(f"Narración guardada: {md_path} | {json_path}")
 
     review_cols = st.columns(3)
@@ -509,7 +521,24 @@ with tabs[6]:
             report = build_review_report(match_id, use_api=use_api)
             md_path, json_path = save_review_report(report)
             st.session_state[review_key] = report
+            st.session_state[review_paths_key] = {"markdown": md_path, "json": json_path}
             st.success(f"Revisión guardada: {md_path} | {json_path}")
+
+    narrative_paths = st.session_state.get(narrative_paths_key)
+    if narrative_paths:
+        render_export_downloads(
+            narrative_paths,
+            key_prefix=f"narrative_downloads_{match_id}_{selected_tone}",
+            keys=("markdown", "json"),
+        )
+
+    review_paths = st.session_state.get(review_paths_key)
+    if review_paths:
+        render_export_downloads(
+            review_paths,
+            key_prefix=f"review_downloads_{match_id}",
+            keys=("markdown", "json"),
+        )
 
     if current_result:
         status_cols = st.columns(3)
@@ -660,6 +689,12 @@ with tabs[6]:
             path = report_paths.get(label)
             if path:
                 st.write(f"- {format_labels[label]}: {path}")
+        render_export_downloads(
+            report_paths,
+            key_prefix=f"final_report_base_downloads_{match_id}_{selected_tone}_{report_paths.get('export_suffix', '')}",
+            keys=("markdown", "html", "json"),
+            labels=format_labels,
+        )
 
         st.write("Formatos adicionales")
         optional_paths = False
@@ -668,6 +703,13 @@ with tabs[6]:
             if path:
                 optional_paths = True
                 st.write(f"- {format_labels[label]}: {path}")
+        if optional_paths:
+            render_export_downloads(
+                report_paths,
+                key_prefix=f"final_report_extra_downloads_{match_id}_{selected_tone}_{report_paths.get('export_suffix', '')}",
+                keys=("pdf", "docx"),
+                labels=format_labels,
+            )
         if not optional_paths:
             st.caption("No se generó ningún formato adicional en esta corrida.")
 
@@ -777,6 +819,11 @@ with tabs[7]:
         }.items():
             if v2_paths.get(key):
                 st.write(f"**{label}:** `{v2_paths[key]}`")
+        render_export_downloads(
+            v2_paths,
+            key_prefix=f"narrative_v2_downloads_{match_id}_{selected_style_id}_{v2_paths.get('export_suffix', '')}",
+            keys=("markdown", "html", "json", "pdf", "docx"),
+        )
         v2_status_cols = st.columns(2)
         v2_status_cols[0].metric("PDF", v2_paths.get("pdf_status", "not_requested"))
         v2_status_cols[1].metric("DOCX", v2_paths.get("docx_status", "not_requested"))
@@ -855,11 +902,13 @@ with tabs[8]:
     )
 
     benchmark_key = "benchmark_result_all_no_api"
+    benchmark_paths_key = "benchmark_paths_all_no_api"
     benchmark_cols = st.columns(2)
     if benchmark_cols[0].button("Ejecutar benchmark sin API"):
         with st.spinner("Ejecutando benchmark y regresión narrativa..."):
             try:
                 st.session_state[benchmark_key] = run_all_benchmarks(use_api=False)
+                st.session_state.pop(benchmark_paths_key, None)
             except Exception as exc:
                 st.error(f"No se pudo ejecutar benchmark: {exc}")
 
@@ -868,9 +917,18 @@ with tabs[8]:
         if benchmark_result:
             try:
                 paths = save_benchmark_result(benchmark_result)
+                st.session_state[benchmark_paths_key] = paths
                 st.success(f"Benchmark guardado: {paths['markdown']} | {paths['json']}")
             except Exception as exc:
                 st.error(f"No se pudo guardar benchmark: {exc}")
+
+    benchmark_paths = st.session_state.get(benchmark_paths_key)
+    if benchmark_paths:
+        render_export_downloads(
+            benchmark_paths,
+            key_prefix=f"benchmark_downloads_{benchmark_paths.get('export_suffix', '')}",
+            keys=("markdown", "json"),
+        )
 
     if benchmark_result:
         summary_result = benchmark_result.get("summary", {})
@@ -928,11 +986,13 @@ with tabs[8]:
         step=1,
     )
     generic_key = f"generic_validation_{int(generic_match_id)}"
+    generic_paths_key = f"generic_validation_paths_{int(generic_match_id)}"
     generic_cols = st.columns(2)
     if generic_cols[0].button("Validar partido"):
         with st.spinner("Ejecutando validación genérica..."):
             try:
                 st.session_state[generic_key] = validate_any_match(int(generic_match_id), use_api=False)
+                st.session_state.pop(generic_paths_key, None)
             except Exception as exc:
                 st.error(f"No se pudo ejecutar la validación genérica: {exc}")
 
@@ -941,9 +1001,18 @@ with tabs[8]:
         if generic_result:
             try:
                 paths = save_generic_validation_result(generic_result)
+                st.session_state[generic_paths_key] = paths
                 st.success(f"Validación guardada: {paths['markdown']} | {paths['json']}")
             except Exception as exc:
                 st.error(f"No se pudo guardar la validación genérica: {exc}")
+
+    generic_paths = st.session_state.get(generic_paths_key)
+    if generic_paths:
+        render_export_downloads(
+            generic_paths,
+            key_prefix=f"generic_validation_downloads_{generic_match_id}_{generic_paths.get('export_suffix', '')}",
+            keys=("markdown", "json"),
+        )
 
     if generic_result:
         generic_summary = generic_result.get("summary", {})
@@ -1015,6 +1084,7 @@ with tabs[9]:
     comparison_match_b = options[comparison_label_b]
     comparison_key = f"comparison_{comparison_match_a}_{comparison_match_b}"
     comparison_narrative_key = f"comparison_narrative_{comparison_match_a}_{comparison_match_b}"
+    comparison_paths_key = f"comparison_paths_{comparison_match_a}_{comparison_match_b}"
 
     comparison_actions = st.columns(3)
     if comparison_actions[0].button("Comparar partidos"):
@@ -1022,6 +1092,7 @@ with tabs[9]:
             try:
                 st.session_state[comparison_key] = compare_matches(comparison_match_a, comparison_match_b)
                 st.session_state.pop(comparison_narrative_key, None)
+                st.session_state.pop(comparison_paths_key, None)
             except Exception as exc:
                 st.error(f"No se pudo comparar partidos: {exc}")
 
@@ -1050,9 +1121,21 @@ with tabs[9]:
         if current_comparison:
             try:
                 paths = save_match_comparison(current_comparison, current_narrative)
+                st.session_state[comparison_paths_key] = paths
                 st.success(f"Comparación guardada: {paths['markdown']} | {paths['json']}")
             except Exception as exc:
                 st.error(f"No se pudo guardar la comparación: {exc}")
+
+    comparison_paths = st.session_state.get(comparison_paths_key)
+    if comparison_paths:
+        render_export_downloads(
+            comparison_paths,
+            key_prefix=(
+                f"match_comparison_downloads_{comparison_match_a}_{comparison_match_b}_"
+                f"{comparison_paths.get('export_suffix', '')}"
+            ),
+            keys=("markdown", "json"),
+        )
 
     if current_comparison:
         match_a = current_comparison.get("match_a", {})
@@ -1245,6 +1328,7 @@ with tabs[10]:
         player_narrative_key = (
             f"player_comparison_narrative_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
         )
+        player_paths_key = f"player_comparison_paths_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
 
         player_action_cols = st.columns(3)
         if player_action_cols[0].button("Comparar jugadores"):
@@ -1257,6 +1341,7 @@ with tabs[10]:
                         player_id_b,
                     )
                     st.session_state.pop(player_narrative_key, None)
+                    st.session_state.pop(player_paths_key, None)
                 except Exception as exc:
                     st.error(f"No se pudo comparar jugadores: {exc}")
 
@@ -1287,9 +1372,21 @@ with tabs[10]:
             if current_player_comparison:
                 try:
                     paths = save_player_comparison(current_player_comparison, current_player_narrative)
+                    st.session_state[player_paths_key] = paths
                     st.success(f"Comparación guardada: {paths['markdown']} | {paths['json']}")
                 except Exception as exc:
                     st.error(f"No se pudo guardar la comparación: {exc}")
+
+        player_paths = st.session_state.get(player_paths_key)
+        if player_paths:
+            render_export_downloads(
+                player_paths,
+                key_prefix=(
+                    f"player_comparison_downloads_{player_match_a}_{player_id_a}_"
+                    f"{player_match_b}_{player_id_b}_{player_paths.get('export_suffix', '')}"
+                ),
+                keys=("markdown", "json"),
+            )
 
         if current_player_comparison:
             player_a = current_player_comparison.get("player_a", {})
@@ -1567,6 +1664,16 @@ with tabs[10]:
             for key, label in route_labels.items():
                 if scouting_paths.get(key):
                     st.write(f"**{label}:** `{scouting_paths[key]}`")
+            render_export_downloads(
+                scouting_paths,
+                key_prefix=(
+                    "scouting_downloads_"
+                    f"{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}_"
+                    f"{scouting_paths.get('export_suffix', '')}"
+                ),
+                keys=("markdown", "html", "json", "pdf", "docx"),
+                labels=route_labels,
+            )
             status_cols = st.columns(2)
             status_cols[0].metric("PDF", scouting_paths.get("pdf_status", "not_requested"))
             status_cols[1].metric("DOCX", scouting_paths.get("docx_status", "not_requested"))
@@ -1788,6 +1895,15 @@ with tabs[11]:
             }.items():
                 if v2_paths.get(key):
                     st.write(f"**{label}:** `{v2_paths[key]}`")
+            render_export_downloads(
+                v2_paths,
+                key_prefix=(
+                    "scouting_v2_downloads_"
+                    f"{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}_"
+                    f"{v2_paths.get('export_suffix', '')}"
+                ),
+                keys=("markdown", "html", "json", "pdf", "docx"),
+            )
             status_v2_cols = st.columns(2)
             status_v2_cols[0].metric("PDF", v2_paths.get("pdf_status", "not_requested"))
             status_v2_cols[1].metric("DOCX", v2_paths.get("docx_status", "not_requested"))
@@ -1851,12 +1967,17 @@ with tabs[13]:
         st.json(to_jsonable(advanced_tables), expanded=False)
 
     st.subheader("Exportar JSON")
+    analysis_context_path_key = f"analysis_context_export_{match_id}"
     if st.button("Exportar contexto analítico"):
         ANALYTICS_EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
         output_path = ANALYTICS_EXPORTS_DIR / f"analysis.match-{match_id}.json"
         with output_path.open("w", encoding="utf-8") as file:
             json.dump(to_jsonable(context), file, ensure_ascii=False, indent=2)
             file.write("\n")
+        st.session_state[analysis_context_path_key] = output_path
         st.success(f"JSON exportado: {output_path.as_posix()}")
+    analysis_context_path = st.session_state.get(analysis_context_path_key)
+    if analysis_context_path:
+        render_download_button(analysis_context_path, "JSON", f"analysis_context_download_{match_id}")
 
 render_footer()

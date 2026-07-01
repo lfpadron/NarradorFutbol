@@ -26,6 +26,7 @@ from src.analytics.advanced_charts import (
 from src.analytics.db import AnalyticsDatabaseError, query_df
 from src.reports.tab_pdf import save_analysis_tab_pdf
 from src.security.streamlit_auth import require_login
+from src.ui.downloads import render_download_button
 from src.ui.footer import render_footer
 from src.ui.formatters import format_score
 from src.ui.pitch_charts import plot_pass_network
@@ -82,11 +83,17 @@ def render_pdf_button(
     key: str | None = None,
 ) -> None:
     button_key = key or f"advanced_pdf_{tab_name}_{match_id}_{selected_team}_{selected_player_label}"
-    if not st.button("Exportar PDF de esta pestaña", key=button_key):
+    result_key = f"{button_key}_result"
+    if st.button("Exportar PDF de esta pestaña", key=button_key):
+        st.session_state[result_key] = save_analysis_tab_pdf(tab_name, match_id, title, sections, figures or [])
+
+    result = st.session_state.get(result_key)
+    if not result:
         return
-    result = save_analysis_tab_pdf(tab_name, match_id, title, sections, figures or [])
+
     if result.get("status") == "generated":
         st.success(f"PDF exportado: `{result.get('path')}`")
+        render_download_button(result.get("path"), "PDF", f"{button_key}_download")
     else:
         st.error(f"No se pudo exportar PDF: {result.get('error_message')}")
     warnings = result.get("warnings") or []
