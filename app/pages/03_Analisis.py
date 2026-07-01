@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import json
+import sys
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.analytics.ai_context import build_ai_match_context
 from src.analytics.db import AnalyticsDatabaseError, query_df
@@ -31,6 +37,8 @@ from src.comparison.player_visuals import (
     plot_player_profile_groups,
     plot_player_radar,
     plot_player_strengths_weaknesses,
+    player_chart_colors,
+    player_comparison_colors,
 )
 from src.config import ANALYTICS_EXPORTS_DIR
 from src.ingestion.utils import to_jsonable
@@ -43,7 +51,7 @@ from src.narrative.tone_comparison import compare_tones
 from src.narrative_v2.narrator_v2 import (
     compare_specialized_styles,
     generate_specialized_narrative,
-    save_specialized_narrative,
+    save_specialized_narrative_export,
 )
 from src.narrative_v2.style_profiles import STYLE_PROFILES
 from src.reports.html_report import render_html_report
@@ -51,13 +59,15 @@ from src.reports.markdown_report import render_markdown_report
 from src.reports.report_builder import build_match_report
 from src.reports.report_history import build_history_record, list_report_history, record_report_generation
 from src.reports.report_store import save_report
+from src.reports.tab_pdf import save_analysis_tab_pdf
 from src.scouting.scouting_history import list_scouting_history
 from src.scouting.scouting_narrator import generate_scouting_narrative
 from src.scouting.scouting_report import save_scouting_report
 from src.scouting.scouting_v2 import generate_scouting_v2
 from src.scouting.scouting_v2_report import save_scouting_v2_report
 from src.security.streamlit_auth import require_login
-from src.ui.charts import momentum_line, shot_count_bar, xg_bar
+from src.ui.charts import momentum_line, shots_on_target_bar, xg_bar
+from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_pct, format_score
 from src.ui.pitch_charts import (
     plot_cumulative_xg,
@@ -70,6 +80,11 @@ from src.ui.pitch_charts import (
 st.set_page_config(page_title="Análisis", layout="wide")
 require_login()
 st.title("Análisis")
+
+
+def stop_with_footer() -> None:
+    render_footer()
+    st.stop()
 
 
 @st.cache_data(show_spinner=False)
@@ -117,15 +132,44 @@ def team_options(team_stats: list[dict[str, object]]) -> list[str]:
     return [str(row["team_name"]) for row in team_stats if row.get("team_name")]
 
 
+def render_tab_pdf_button(
+    tab_name: str,
+    match_id: int,
+    title: str,
+    sections: list[dict[str, object]],
+    figures: list[object] | None = None,
+    key: str | None = None,
+    disabled: bool = False,
+) -> None:
+    if not st.button("Exportar PDF de esta pestaña", key=key or f"export_pdf_{tab_name}_{match_id}", disabled=disabled):
+        return
+    result = save_analysis_tab_pdf(tab_name, match_id, title, sections, figures)
+    if result.get("status") == "generated":
+        st.success(f"PDF exportado: `{result.get('path')}`")
+    else:
+        st.error(f"No se pudo exportar PDF: {result.get('error_message')}")
+    warnings = result.get("warnings") or []
+    if warnings:
+        st.info(" ".join(str(warning) for warning in warnings))
+
+
+def table_rows(rows: object, limit: int = 24) -> list[dict[str, object]]:
+    if isinstance(rows, pd.DataFrame):
+        frame = rows.head(limit)
+    else:
+        frame = pd.DataFrame(rows).head(limit)
+    return frame.to_dict("records") if not frame.empty else []
+
+
 try:
     matches = load_match_options()
 except AnalyticsDatabaseError as exc:
     st.error(str(exc))
-    st.stop()
+    stop_with_footer()
 
 if matches.empty:
     st.info("No hay partidos transformados para analizar.")
-    st.stop()
+    stop_with_footer()
 
 options = {
     f"{row.match_id} | {row.match_date} | {row.home_team_name} {row.home_score}-{row.away_score} {row.away_team_name}": int(
@@ -141,15 +185,23 @@ try:
     context = load_context(match_id)
 except (AnalyticsDatabaseError, ValueError) as exc:
     st.error(str(exc))
-    st.stop()
+    stop_with_footer()
 
 summary = detail["summary"]
 team_stats = detail["team_stats"]
 teams = team_options(team_stats)
+home_team = str(summary.get("home_team_name") or "")
+away_team = str(summary.get("away_team_name") or "")
+match_score_label = format_score(
+    summary.get("home_team_name"),
+    summary.get("home_score"),
+    summary.get("away_score"),
+    summary.get("away_team_name"),
+)
 
 st.caption(
     f"{summary.get('match_date')} | "
-    f"{format_score(summary.get('home_team_name'), summary.get('home_score'), summary.get('away_score'), summary.get('away_team_name'))}"
+    f"{match_score_label}"
 )
 
 tabs = st.tabs(
@@ -209,20 +261,55 @@ with tabs[1]:
         format_float(best_chance.get("shot_statsbomb_xg") if best_chance else None),
     )
 
-    st.plotly_chart(
-        plot_shot_map(
-            detail["shots"],
-            str(summary.get("home_team_name") or ""),
-            str(summary.get("away_team_name") or ""),
-        ),
-        width="stretch",
+    label_options = {
+        "Sin nombres": "none",
+        "Goles": "goals",
+        "Tiros": "shots",
+    }
+    selected_label_mode = st.selectbox(
+        "Etiquetas del mapa de tiros",
+        list(label_options.keys()),
+        key=f"shot_map_labels_{match_id}",
     )
-    st.plotly_chart(plot_cumulative_xg(detail["shots"]), width="stretch")
+
+    shot_map_fig = plot_shot_map(
+        detail["shots"],
+        home_team,
+        away_team,
+        label_mode=label_options[selected_label_mode],
+    )
+    cumulative_xg_fig = plot_cumulative_xg(detail["shots"], home_team, away_team)
+    shots_on_target_fig = shots_on_target_bar(detail["shots"], home_team, away_team)
+    xg_team_fig = xg_bar(team_stats, home_team, away_team)
+
+    st.plotly_chart(shot_map_fig, width="stretch")
+    st.plotly_chart(cumulative_xg_fig, width="stretch")
 
     chart_cols = st.columns(2)
-    chart_cols[0].plotly_chart(shot_count_bar(team_stats), width="stretch")
-    chart_cols[1].plotly_chart(xg_bar(team_stats), width="stretch")
+    chart_cols[0].plotly_chart(shots_on_target_fig, width="stretch")
+    chart_cols[1].plotly_chart(xg_team_fig, width="stretch")
     st.dataframe(pd.DataFrame(detail["shots"]), width="stretch")
+    render_tab_pdf_button(
+        "tiros_xg",
+        match_id,
+        f"Tiros y xG | {match_score_label}",
+        [
+            {
+                "heading": "Resumen",
+                "rows": [
+                    {
+                        "tiros": shot_summary.get("total_shots", 0),
+                        "goles": shot_summary.get("total_goals", 0),
+                        "xg": format_float(shot_summary.get("total_xg")),
+                        "mejor_ocasion": format_float(best_chance.get("shot_statsbomb_xg") if best_chance else None),
+                    }
+                ],
+            },
+            {"heading": "Tiros", "rows": table_rows(detail["shots"])},
+        ],
+        [shot_map_fig, cumulative_xg_fig, shots_on_target_fig, xg_team_fig],
+        key=f"export_pdf_tiros_xg_{match_id}",
+    )
 
 with tabs[2]:
     st.subheader("Pases")
@@ -236,40 +323,82 @@ with tabs[2]:
     pass_cols[4].metric("Pases clave", pass_summary.get("key_passes", 0))
 
     pass_team_filter = st.selectbox("Equipo para mapa de pases progresivos", ["Todos", *teams])
-    st.plotly_chart(
-        plot_progressive_passes(
-            detail["progressive_passes"],
-            None if pass_team_filter == "Todos" else pass_team_filter,
-        ),
-        width="stretch",
+    pass_map_fig = plot_progressive_passes(
+        detail["progressive_passes"],
+        None if pass_team_filter == "Todos" else pass_team_filter,
+        home_team,
+        away_team,
     )
+    st.plotly_chart(pass_map_fig, width="stretch")
     st.dataframe(pd.DataFrame(detail["progressive_passes"]), width="stretch")
 
+    pass_figures = [pass_map_fig]
     if teams:
         network_team = st.selectbox("Equipo para red de pases", teams)
-        st.plotly_chart(plot_pass_network(load_pass_network(match_id, network_team)), width="stretch")
+        pass_network_fig = plot_pass_network(load_pass_network(match_id, network_team))
+        st.plotly_chart(pass_network_fig, width="stretch")
+        pass_figures.append(pass_network_fig)
     else:
         st.info("No hay equipos disponibles para construir red de pases.")
+    render_tab_pdf_button(
+        "pases",
+        match_id,
+        f"Pases | {match_score_label}",
+        [
+            {
+                "heading": "Resumen de pases",
+                "rows": [
+                    {
+                        "pases": pass_summary.get("total_passes", 0),
+                        "completados": pass_summary.get("successful_passes", 0),
+                        "porcentaje_completados": format_pct(pass_summary.get("pass_completion_pct")),
+                        "asistencias": pass_summary.get("assists", 0),
+                        "pases_clave": pass_summary.get("key_passes", 0),
+                    }
+                ],
+            },
+            {"heading": "Pases progresivos", "rows": table_rows(detail["progressive_passes"])},
+        ],
+        pass_figures,
+        key=f"export_pdf_pases_{match_id}",
+    )
 
 with tabs[3]:
     st.subheader("Presión")
     st.write("Mapa de eventos de presión y counterpress. Maneja partidos sin presiones registradas.")
     pressure_team_filter = st.selectbox("Equipo para presiones", ["Todos", *teams])
-    st.plotly_chart(
-        plot_pressure_map(
-            detail["pressures"],
-            None if pressure_team_filter == "Todos" else pressure_team_filter,
-        ),
-        width="stretch",
+    pressure_fig = plot_pressure_map(
+        detail["pressures"],
+        None if pressure_team_filter == "Todos" else pressure_team_filter,
+        home_team,
+        away_team,
     )
+    st.plotly_chart(pressure_fig, width="stretch")
     st.dataframe(pd.DataFrame(detail["pressures"]), width="stretch")
+    render_tab_pdf_button(
+        "presion",
+        match_id,
+        f"Presión | {match_score_label}",
+        [{"heading": "Presiones", "rows": table_rows(detail["pressures"])}],
+        [pressure_fig],
+        key=f"export_pdf_presion_{match_id}",
+    )
 
 with tabs[4]:
     st.subheader("Momentum")
     st.write("Fórmula MVP: tiros * 3 + xG * 10 + entradas al tercio final * 1 " "+ eventos ofensivos * 0.5.")
     momentum = detail["momentum"]
-    st.plotly_chart(momentum_line(momentum), width="stretch")
+    momentum_fig = momentum_line(momentum, home_team, away_team)
+    st.plotly_chart(momentum_fig, width="stretch")
     st.dataframe(pd.DataFrame(momentum), width="stretch")
+    render_tab_pdf_button(
+        "momentum",
+        match_id,
+        f"Momentum | {match_score_label}",
+        [{"heading": "Momentum por intervalos", "rows": table_rows(momentum)}],
+        [momentum_fig],
+        key=f"export_pdf_momentum_{match_id}",
+    )
 
 with tabs[5]:
     st.subheader("Análisis avanzado")
@@ -596,6 +725,19 @@ with tabs[7]:
 
     v2_result_key = f"narrative_v2_result_{match_id}_{selected_style_id}"
     v2_comparison_key = f"narrative_v2_comparison_{match_id}"
+    v2_paths_key = f"narrative_v2_paths_{match_id}_{selected_style_id}"
+    v2_export_cols = st.columns(2)
+    v2_include_pdf = v2_export_cols[0].checkbox(
+        "Generar PDF",
+        value=False,
+        key=f"narrative_v2_pdf_{match_id}_{selected_style_id}",
+    )
+    v2_include_docx = v2_export_cols[1].checkbox(
+        "Generar DOCX",
+        value=True,
+        key=f"narrative_v2_docx_{match_id}_{selected_style_id}",
+    )
+
     v2_cols = st.columns(3)
     if v2_cols[0].button("Generar narrativa v2"):
         with st.spinner("Generando narrativa especializada..."):
@@ -604,6 +746,7 @@ with tabs[7]:
                 selected_style_id,
                 use_api=use_api_v2,
             )
+            st.session_state.pop(v2_paths_key, None)
 
     if v2_cols[1].button("Comparar estilos"):
         with st.spinner("Comparando estilos v2..."):
@@ -615,8 +758,34 @@ with tabs[7]:
     v2_result = st.session_state.get(v2_result_key)
     if v2_cols[2].button("Guardar narrativa v2", disabled=v2_result is None):
         if v2_result:
-            md_path, json_path = save_specialized_narrative(v2_result)
-            st.success(f"Narrativa v2 guardada: {md_path} | {json_path}")
+            v2_paths = save_specialized_narrative_export(
+                v2_result,
+                include_pdf=v2_include_pdf,
+                include_docx=v2_include_docx,
+            )
+            st.session_state[v2_paths_key] = v2_paths
+            st.success("Narrativa v2 guardada.")
+
+    v2_paths = st.session_state.get(v2_paths_key)
+    if v2_paths:
+        st.markdown("### Export v2")
+        for key, label in {
+            "markdown": "Markdown",
+            "json": "JSON",
+            "pdf": "PDF",
+            "docx": "DOCX",
+        }.items():
+            if v2_paths.get(key):
+                st.write(f"**{label}:** `{v2_paths[key]}`")
+        v2_status_cols = st.columns(2)
+        v2_status_cols[0].metric("PDF", v2_paths.get("pdf_status", "not_requested"))
+        v2_status_cols[1].metric("DOCX", v2_paths.get("docx_status", "not_requested"))
+        if v2_paths.get("pdf_warning_message"):
+            st.info(f"PDF: {v2_paths.get('pdf_warning_message')}")
+        if v2_paths.get("pdf_error_message"):
+            st.warning(f"PDF: {v2_paths.get('pdf_error_message')}")
+        if v2_paths.get("docx_error_message"):
+            st.warning(f"DOCX: {v2_paths.get('docx_error_message')}")
 
     if v2_result:
         st.markdown("### Resultado v2")
@@ -1146,16 +1315,20 @@ with tabs[10]:
 
             radar_metrics = build_player_radar_metrics(current_player_comparison)
             strengths_weaknesses = plot_player_strengths_weaknesses(radar_metrics)
+            comparison_colors = player_comparison_colors(current_player_comparison)
+            radar_fig = plot_player_radar(radar_metrics, comparison_colors)
+            metric_bars_fig = plot_player_metric_bars(current_player_comparison, comparison_colors)
+            profile_groups_fig = plot_player_profile_groups(current_player_comparison, comparison_colors)
             st.markdown("### Radar comparativo")
-            st.plotly_chart(plot_player_radar(radar_metrics), width="stretch")
+            st.plotly_chart(radar_fig, width="stretch")
 
             visual_cols = st.columns(2)
             with visual_cols[0]:
                 st.markdown("### Métricas comparativas")
-                st.plotly_chart(plot_player_metric_bars(current_player_comparison), width="stretch")
+                st.plotly_chart(metric_bars_fig, width="stretch")
             with visual_cols[1]:
                 st.markdown("### Perfil por grupos")
-                st.plotly_chart(plot_player_profile_groups(current_player_comparison), width="stretch")
+                st.plotly_chart(profile_groups_fig, width="stretch")
 
             st.markdown("### Fortalezas y debilidades")
             sw_cols = st.columns(2)
@@ -1221,6 +1394,46 @@ with tabs[10]:
                 st.warning("Advertencias de comparación")
                 for warning in player_warnings:
                     st.write(f"- {warning}")
+
+            player_pdf_sections = [
+                {
+                    "heading": "Jugadores",
+                    "rows": [
+                        {
+                            "jugador": "A",
+                            "nombre": player_a.get("player_name"),
+                            "equipo": player_a.get("team_name"),
+                            "goles": player_a.get("goals"),
+                            "xg": format_float(player_a.get("xg")),
+                            "impacto": format_float(player_a.get("impact_score")),
+                        },
+                        {
+                            "jugador": "B",
+                            "nombre": player_b.get("player_name"),
+                            "equipo": player_b.get("team_name"),
+                            "goles": player_b.get("goals"),
+                            "xg": format_float(player_b.get("xg")),
+                            "impacto": format_float(player_b.get("impact_score")),
+                        },
+                    ],
+                },
+                {"heading": "Diferencias", "rows": diff_rows},
+            ]
+            if current_player_narrative:
+                player_pdf_sections.append(
+                    {
+                        "heading": "Narrativa comparativa",
+                        "paragraphs": [current_player_narrative.get("narrative_markdown") or ""],
+                    }
+                )
+            render_tab_pdf_button(
+                "comparador_jugadores",
+                match_id,
+                "Comparador de jugadores",
+                player_pdf_sections,
+                [radar_fig, metric_bars_fig, profile_groups_fig],
+                key=f"export_pdf_player_comparison_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}",
+            )
 
         if current_player_narrative:
             narrative_warnings = current_player_narrative.get("warnings", [])
@@ -1505,7 +1718,9 @@ with tabs[11]:
                 metric_cols_b[2].metric("Secundario B", profile_b.get("secondary_archetype", {}).get("name"))
                 metric_cols_b[3].metric("Rol observado B", profile_b.get("position_name"))
 
-            st.plotly_chart(plot_player_radar(current_v2.get("radar_metrics", {})), width="stretch")
+            v2_colors = player_chart_colors(profile_a.get("team_name"), profile_b.get("team_name"))
+            v2_radar_fig = plot_player_radar(current_v2.get("radar_metrics", {}), v2_colors)
+            st.plotly_chart(v2_radar_fig, width="stretch")
             strength_cols = st.columns(2)
             with strength_cols[0]:
                 st.markdown("#### Fortalezas A")
@@ -1528,6 +1743,38 @@ with tabs[11]:
                 for warning in warnings_v2:
                     st.write(f"- {warning}")
             st.markdown(current_v2.get("narrative_markdown") or "")
+            v2_rows = [
+                {
+                    "jugador": "A",
+                    "nombre": profile_a.get("player_name"),
+                    "equipo": profile_a.get("team_name"),
+                    "arquetipo": profile_a.get("archetype"),
+                    "confianza": profile_a.get("confidence"),
+                    "rol_observado": profile_a.get("position_name"),
+                }
+            ]
+            if profile_b:
+                v2_rows.append(
+                    {
+                        "jugador": "B",
+                        "nombre": profile_b.get("player_name"),
+                        "equipo": profile_b.get("team_name"),
+                        "arquetipo": profile_b.get("archetype"),
+                        "confianza": profile_b.get("confidence"),
+                        "rol_observado": profile_b.get("position_name"),
+                    }
+                )
+            render_tab_pdf_button(
+                "scouting_ai_v2",
+                int(v2_match_a),
+                "Scouting AI v2",
+                [
+                    {"heading": "Perfiles", "rows": v2_rows},
+                    {"heading": "Narrativa", "paragraphs": [current_v2.get("narrative_markdown") or ""]},
+                ],
+                [v2_radar_fig],
+                key=f"export_pdf_scouting_v2_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}",
+            )
 
         v2_paths = st.session_state.get(v2_paths_key)
         if v2_paths:
@@ -1611,3 +1858,5 @@ with tabs[13]:
             json.dump(to_jsonable(context), file, ensure_ascii=False, indent=2)
             file.write("\n")
         st.success(f"JSON exportado: {output_path.as_posix()}")
+
+render_footer()

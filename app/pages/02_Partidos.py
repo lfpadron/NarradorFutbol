@@ -1,15 +1,28 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from src.analytics.db import AnalyticsDatabaseError, query_df
 from src.security.streamlit_auth import require_login
+from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_score
 
 st.set_page_config(page_title="Partidos", layout="wide")
 require_login()
 st.title("Partidos")
+
+
+def stop_with_footer() -> None:
+    render_footer()
+    st.stop()
 
 
 @st.cache_data(show_spinner=False)
@@ -44,11 +57,11 @@ try:
     matches = load_matches()
 except AnalyticsDatabaseError as exc:
     st.error(str(exc))
-    st.stop()
+    stop_with_footer()
 
 if matches.empty:
     st.info("No hay partidos transformados.")
-    st.stop()
+    stop_with_footer()
 
 col1, col2, col3, col4 = st.columns(4)
 competitions = ["Todas", *sorted(matches["competition_name"].dropna().unique().tolist())]
@@ -73,7 +86,7 @@ st.dataframe(filtered, width="stretch")
 
 if filtered.empty:
     st.info("No hay partidos con esos filtros.")
-    st.stop()
+    stop_with_footer()
 
 options = {
     f"{row.match_id} | {row.match_date} | {row.home_team_name} {row.home_score}-{row.away_score} {row.away_team_name}": int(
@@ -104,3 +117,4 @@ st.write(
         "pases": int(row["total_passes"]),
     }
 )
+render_footer()

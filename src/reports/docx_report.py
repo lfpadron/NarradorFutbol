@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from src.reports.branding import add_docx_footer
+
 
 def render_docx_report(report: dict[str, Any], output_path: str) -> dict[str, Any]:
     path = Path(output_path)
@@ -42,6 +44,7 @@ def render_docx_report(report: dict[str, Any], output_path: str) -> dict[str, An
         _add_quality(document, report)
         _add_validation(document, report)
         _add_traceability(document, report)
+        add_docx_footer(document)
 
         path.parent.mkdir(parents=True, exist_ok=True)
         document.save(str(path))

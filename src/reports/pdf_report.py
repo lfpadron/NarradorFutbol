@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import base64
 import io
 import re
 from datetime import datetime
@@ -12,6 +13,7 @@ from typing import Any
 from xml.sax.saxutils import escape
 
 from src.config import PROJECT_ROOT
+from src.reports.branding import add_report_footer_to_html, draw_reportlab_footer
 
 
 def render_pdf_report(html: str, output_path: str) -> dict[str, Any]:
@@ -26,12 +28,13 @@ def render_pdf_report(html: str, output_path: str) -> dict[str, Any]:
         }
 
     weasyprint_output = io.StringIO()
+    branded_html = add_report_footer_to_html(html)
     try:
         with contextlib.redirect_stdout(weasyprint_output), contextlib.redirect_stderr(weasyprint_output):
             from weasyprint import HTML
 
             path.parent.mkdir(parents=True, exist_ok=True)
-            HTML(string=html, base_url=str(PROJECT_ROOT)).write_pdf(str(path))
+            HTML(string=branded_html, base_url=str(PROJECT_ROOT)).write_pdf(str(path))
         return {
             "status": "generated",
             "path": path.as_posix(),
@@ -135,6 +138,11 @@ def _render_reportlab_pdf(html: str, path: Path) -> dict[str, Any]:
                 if table is not None:
                     story.append(table)
                     story.append(Spacer(1, 8))
+            elif block_type == "image":
+                image = _build_image(payload, content_width)
+                if image is not None:
+                    story.append(image)
+                    story.append(Spacer(1, 8))
             elif payload:
                 story.append(Paragraph(escape(str(payload)), body_style))
 
@@ -182,7 +190,7 @@ def _write_reportlab_document(
         bottomMargin=margin,
         title=path.stem,
     )
-    document.build(list(story))
+    document.build(list(story), onFirstPage=draw_reportlab_footer, onLaterPages=draw_reportlab_footer)
 
 
 def _prepare_pdf_output_path(path: Path) -> tuple[Path, str | None]:
@@ -255,6 +263,26 @@ def _build_table(
     return table
 
 
+def _build_image(payload: dict[str, str], content_width: float) -> Any | None:
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Image
+
+    source = payload.get("src", "")
+    match = re.match(r"data:image/[^;]+;base64,(.+)", source, flags=re.DOTALL)
+    if not match:
+        return None
+    try:
+        data = base64.b64decode(match.group(1).strip())
+        image = Image(io.BytesIO(data))
+        max_height = 4.5 * inch
+        scale = min(content_width / image.imageWidth, max_height / image.imageHeight)
+        image.drawWidth = image.imageWidth * scale
+        image.drawHeight = image.imageHeight * scale
+        return image
+    except Exception:
+        return None
+
+
 class _ReportHTMLParser(HTMLParser):
     _TEXT_TAGS = {"h1", "h2", "h3", "p", "li"}
 
@@ -278,6 +306,12 @@ class _ReportHTMLParser(HTMLParser):
         elif tag == "table":
             self._flush_text_block()
             self._table = []
+        elif tag == "img" and self._table is None:
+            self._flush_text_block()
+            attrs_map = {key.lower(): value or "" for key, value in attrs}
+            source = attrs_map.get("src", "")
+            if source.startswith("data:image/"):
+                self.blocks.append(("image", {"src": source, "alt": attrs_map.get("alt", "")}))
         elif tag == "tr" and self._table is not None:
             self._row = []
         elif tag in {"td", "th"} and self._row is not None:

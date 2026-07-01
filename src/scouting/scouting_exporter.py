@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 import re
+from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ import markdown
 
 from src.config import SCOUTING_DIR, project_relative
 from src.ingestion.utils import to_jsonable
+from src.reports.branding import add_docx_footer
 from src.reports.pdf_report import render_pdf_report
 from src.scouting.scouting_history import build_scouting_history_record, record_scouting_generation
 
@@ -255,7 +257,12 @@ def render_scouting_html(result: dict[str, Any], markdown_text: str | None = Non
 """
 
 
-def render_scouting_docx(result: dict[str, Any], markdown_text: str, output_path: str) -> dict[str, Any]:
+def render_scouting_docx(
+    result: dict[str, Any],
+    markdown_text: str,
+    output_path: str,
+    figures: list[tuple[str, bytes]] | None = None,
+) -> dict[str, Any]:
     path = Path(output_path)
     try:
         from docx import Document
@@ -281,6 +288,15 @@ def render_scouting_docx(result: dict[str, Any], markdown_text: str, output_path
         title = document.paragraphs[0] if document.paragraphs else None
         if title is not None:
             title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        for figure_title, image_bytes in figures or []:
+            if not image_bytes:
+                continue
+            document.add_heading(figure_title, level=1)
+            paragraph = document.add_paragraph()
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = paragraph.add_run()
+            run.add_picture(BytesIO(image_bytes), width=Inches(6.3))
+        add_docx_footer(document)
 
         path.parent.mkdir(parents=True, exist_ok=True)
         document.save(str(path))

@@ -67,6 +67,8 @@ def get_progressive_passes(match_id: int) -> list[dict[str, Any]]:
             p.pass_end_x,
             p.pass_end_y,
             p.pass_end_x - e.location_x AS progressive_distance,
+            p.pass_shot_assist,
+            p.pass_goal_assist,
             p.pass_outcome_name
         FROM event e
         INNER JOIN "pass" p ON p.event_id = e.event_id

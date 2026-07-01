@@ -6,6 +6,7 @@ tqdm
 python-dotenv
 openai
 markdown
+kaleido
 python-docx
 reportlab
 weasyprint

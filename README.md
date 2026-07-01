@@ -54,10 +54,12 @@ SMTP_PORT=587
 SMTP_USERNAME=
 SMTP_PASSWORD=
 SMTP_FROM_EMAIL=
+SMTP_FROM_NAME=Narrador Futbol
 SMTP_USE_TLS=true
+SMTP_USE_SSL=false
 ```
 
-En local, si no configuras SMTP, las invitaciones se muestran en pantalla dentro de la página **Login** para copiarlas manualmente.
+En local, si no configuras SMTP, las invitaciones se muestran en pantalla dentro de la página **Login** para copiarlas manualmente. Si SMTP está configurado, el correo incluye enlace de invitación y token.
 
 ## Ejecutar localmente
 
@@ -105,6 +107,21 @@ El contenedor expone Streamlit en `http://localhost:8501` y monta:
 - `./data/scouting:/app/data/scouting`
 - `./data/analytics:/app/data/analytics`
 - `./data/security:/app/data/security`
+
+En despliegue, define `APP_BASE_URL` con la URL publica de Streamlit, por ejemplo
+`https://narrador.tu-dominio.com`. Esa URL se usa para generar los enlaces absolutos
+de invitacion por correo.
+
+Para enviar invitaciones por SMTP, configura `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`,
+`SMTP_USE_TLS` y `SMTP_USE_SSL` en el `.env` usado por Compose. Si esas variables
+no estan completas, la app crea la invitacion pero muestra el enlace/token en la
+pantalla de **Login** para copiarlo manualmente.
+
+Los PDFs generados quedan persistidos en los volumenes montados:
+
+- Reportes finales y PDFs de pestañas: `./data/reports` en el host, `/app/data/reports` dentro del contenedor.
+- Scouting AI: `./data/scouting` en el host, `/app/data/scouting` dentro del contenedor.
 
 Los secretos no se copian a la imagen; se leen desde `.env` en ejecución.
 
@@ -804,6 +821,8 @@ Export profesional v2:
 uv run python -m src.scouting.run_scouting_v2 --match-a 7534 --player-a 5571 --match-b 7534 --player-b 5579 --save --html --docx --pdf
 ```
 
+Los exportes HTML, DOCX y PDF de Scouting AI v2 incluyen radar normalizado 0-100 por perfil táctico cuando `kaleido` puede rasterizar la imagen Plotly.
+
 Salidas:
 
 - `data/scouting/scouting_v2.match-7534.5571_YYYYMMDD_HHMMSS.md`
@@ -923,6 +942,8 @@ El PDF intenta usar WeasyPrint primero. En Windows, si faltan librerías nativas
 
 El DOCX usa `python-docx` y debe funcionar localmente sin credenciales. El campo `generated_by` del historial usa `NARRADOR_USER_EMAIL`; si no existe, usa `local_user`.
 
+Los PDF y DOCX generados incluyen pie de página con el Astrogato y el texto `Construido por Luis Fernando Padrón`.
+
 ## Ejecutar interfaz Streamlit
 
 La interfaz Streamlit permite revisar el estado del pipeline, listar partidos transformados, explorar análisis, usar narradores AI, exportar reportes y consultar gráficas avanzadas.
@@ -968,6 +989,7 @@ Dependencias visuales principales:
 
 - `streamlit`
 - `plotly`
+- `kaleido`
 - `mplsoccer`
 - `matplotlib`
 
@@ -992,7 +1014,7 @@ Flujo de invitación:
 
 1. Entrar con un admin semilla en la página **Login**.
 2. Capturar email y rol del usuario.
-3. Enviar por SMTP si está configurado, o copiar el token/enlace mostrado en pantalla.
+3. Enviar enlace y token por SMTP si está configurado, o copiarlos desde la pantalla.
 4. El usuario abre **Login**, pega el token y crea su contraseña.
 5. El usuario `analyst` puede usar análisis, gráficas y reportes.
 
@@ -1046,7 +1068,7 @@ uv run mypy
 ## Límites conocidos v01
 
 - La autenticación es básica y local; no incluye OAuth, SSO ni recuperación automática de contraseña.
-- SMTP es opcional; sin servidor configurado, v01 muestra invitaciones en pantalla.
+- SMTP es opcional; soporta TLS o SSL por variables de entorno y, sin servidor configurado, v01 muestra invitaciones en pantalla.
 - Los arquetipos de scouting se infieren desde un partido; deben validarse con más muestra y video.
 - Los PDFs usan fallback ReportLab cuando WeasyPrint no puede cargar librerías nativas.
 - El despliegue en contenedor monta datos en volumen local; no incluye orquestación multiusuario avanzada.

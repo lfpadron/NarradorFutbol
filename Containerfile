@@ -6,9 +6,17 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     UV_LINK_MODE=copy \
     NARRADOR_DATA_DIR=/app/data \
+    BROWSER_PATH=/usr/bin/chromium \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_SERVER_PORT=8501 \
     STREAMLIT_SERVER_HEADLESS=true
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        chromium \
+        fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev

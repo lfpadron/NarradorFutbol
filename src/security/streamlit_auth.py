@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import smtplib
 from email.message import EmailMessage
+from email.utils import formataddr
 from typing import Any
 from urllib.parse import quote
 
@@ -14,6 +15,7 @@ import streamlit as st
 from src.security.invitations import accept_invitation, create_invitation, list_invitations
 from src.security.models import ROLE_ADMIN, ROLE_ANALYST
 from src.security.storage import authenticate_user, initialize_security, list_users, set_user_active
+from src.ui.footer import render_footer
 
 SESSION_USER_KEY = "auth_user"
 
@@ -24,6 +26,7 @@ def require_login() -> dict:
     if not user:
         st.warning("Inicia sesión para usar el Narrador Inteligente de Fútbol.")
         st.info("Abre la página `Login` en la barra lateral.")
+        render_footer()
         st.stop()
     _render_sidebar_user(user)
     return user
@@ -95,6 +98,7 @@ def render_accept_invitation() -> None:
 def render_admin_panel(user: dict) -> None:
     st.divider()
     st.subheader("Administración de usuarios")
+    _render_smtp_status()
     with st.form("invite_user_form"):
         email = st.text_input("Email a invitar")
         role = st.selectbox("Rol", [ROLE_ANALYST, ROLE_ADMIN])
@@ -107,13 +111,14 @@ def render_admin_panel(user: dict) -> None:
         else:
             st.success(f"Invitación generada para {invitation['email']}.")
             link = _invitation_link(invitation["token"])
-            delivery = _send_invitation_email(invitation["email"], link)
+            delivery = _send_invitation_email(invitation["email"], link, invitation["token"])
             if delivery["status"] == "sent":
-                st.info("Invitación enviada por SMTP.")
+                st.info("Invitación enviada por SMTP con enlace y token.")
             else:
                 if delivery.get("error_message"):
                     st.warning(f"No se pudo enviar por SMTP: {delivery['error_message']}")
                 st.code(link, language="text")
+                st.code(invitation["token"], language="text")
                 st.caption("SMTP no está configurado o falló; usa este enlace/token para desarrollo local.")
 
     users = list_users()
@@ -156,35 +161,90 @@ def _invitation_link(token: str) -> str:
     return f"?{query}"
 
 
-def _send_invitation_email(email: str, link: str) -> dict[str, Any]:
-    host = os.getenv("SMTP_HOST", "").strip()
-    from_email = os.getenv("SMTP_FROM_EMAIL", "").strip()
-    if not host or not from_email:
+def _render_smtp_status() -> None:
+    config = _smtp_config()
+    with st.expander("SMTP invitaciones", expanded=not config["configured"]):
+        if config["configured"]:
+            st.success("SMTP configurado.")
+        else:
+            st.warning("SMTP sin configurar.")
+        st.write(
+            {
+                "host": config["host"] or "N/D",
+                "port": config["port"],
+                "from": config["from_email"] or "N/D",
+                "tls": config["use_tls"],
+                "ssl": config["use_ssl"],
+                "username": config["username"] or "N/D",
+            }
+        )
+
+
+def _send_invitation_email(email: str, link: str, token: str) -> dict[str, Any]:
+    config = _smtp_config()
+    if not config["configured"]:
         return {"status": "not_configured", "error_message": None}
+    if config["port_error"]:
+        return {"status": "failed", "error_message": config["port_error"]}
 
     message = EmailMessage()
     message["Subject"] = "Invitación al Narrador Inteligente de Fútbol"
-    message["From"] = from_email
+    message["From"] = _from_header(config)
     message["To"] = email
     message.set_content(
         "Has sido invitado al Narrador Inteligente de Fútbol.\n\n"
         f"Acepta la invitación aquí:\n{link}\n\n"
+        "Si el enlace no abre, copia este token en la página Login:\n"
+        f"{token}\n\n"
         "Si no esperabas esta invitación, puedes ignorar este correo."
     )
 
-    port = int(os.getenv("SMTP_PORT", "587") or "587")
-    username = os.getenv("SMTP_USERNAME", "").strip()
-    password = os.getenv("SMTP_PASSWORD", "")
-    use_tls = os.getenv("SMTP_USE_TLS", "true").strip().lower() not in {"0", "false", "no", "off"}
-
     try:
-        with smtplib.SMTP(host, port, timeout=15) as smtp:
-            if use_tls:
+        smtp_class = smtplib.SMTP_SSL if config["use_ssl"] else smtplib.SMTP
+        with smtp_class(config["host"], config["port"], timeout=15) as smtp:
+            if config["use_tls"] and not config["use_ssl"]:
                 smtp.starttls()
-            if username and password:
-                smtp.login(username, password)
+            if config["username"] and config["password"]:
+                smtp.login(config["username"], config["password"])
             smtp.send_message(message)
     except Exception as exc:
         return {"status": "failed", "error_message": str(exc)}
 
     return {"status": "sent", "error_message": None}
+
+
+def _smtp_config() -> dict[str, Any]:
+    host = os.getenv("SMTP_HOST", "").strip()
+    from_email = os.getenv("SMTP_FROM_EMAIL", "").strip()
+    port_text = os.getenv("SMTP_PORT", "587").strip() or "587"
+    port_error = None
+    try:
+        port = int(port_text)
+    except ValueError:
+        port = 587
+        port_error = f"SMTP_PORT inválido: {port_text}"
+    return {
+        "host": host,
+        "port": port,
+        "port_error": port_error,
+        "from_email": from_email,
+        "from_name": os.getenv("SMTP_FROM_NAME", "Narrador Futbol").strip(),
+        "username": os.getenv("SMTP_USERNAME", "").strip(),
+        "password": os.getenv("SMTP_PASSWORD", ""),
+        "use_tls": _env_bool("SMTP_USE_TLS", True),
+        "use_ssl": _env_bool("SMTP_USE_SSL", False),
+        "configured": bool(host and from_email),
+    }
+
+
+def _from_header(config: dict[str, Any]) -> str:
+    if config.get("from_name"):
+        return formataddr((str(config["from_name"]), str(config["from_email"])))
+    return str(config["from_email"])
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
