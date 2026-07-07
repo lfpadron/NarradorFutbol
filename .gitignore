@@ -1,4 +1,5 @@
 .env
+deploy/cpanel/*.env
 __pycache__/
 *.py[cod]
 .venv/

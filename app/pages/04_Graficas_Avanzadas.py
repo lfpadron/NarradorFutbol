@@ -29,9 +29,10 @@ from src.security.streamlit_auth import require_login
 from src.ui.downloads import render_download_button
 from src.ui.footer import render_footer
 from src.ui.formatters import format_score
+from src.ui.page_config import soccer_page_icon
 from src.ui.pitch_charts import plot_pass_network
 
-st.set_page_config(page_title="Gráficas avanzadas", layout="wide")
+st.set_page_config(page_title="Gráficas avanzadas", page_icon=soccer_page_icon(), layout="wide")
 require_login()
 st.title("Gráficas avanzadas")
 

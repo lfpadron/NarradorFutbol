@@ -942,7 +942,7 @@ El PDF intenta usar WeasyPrint primero. En Windows, si faltan librerías nativas
 
 El DOCX usa `python-docx` y debe funcionar localmente sin credenciales. El campo `generated_by` del historial usa `NARRADOR_USER_EMAIL`; si no existe, usa `local_user`.
 
-Los PDF y DOCX generados incluyen pie de página con el Astrogato y el texto `Construido por Luis Fernando Padrón`.
+Los PDF y DOCX generados incluyen pie de página con el texto `UNA MISIÓN DE DEMOSTRACIÓN DE:` y el logo enlazado de Astrogato Labs.
 
 ## Ejecutar interfaz Streamlit
 

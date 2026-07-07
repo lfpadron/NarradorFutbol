@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from src.analytics.advanced_charts import build_presence_zones, plot_broadcast_momentum, plot_event_heatmap
 from src.analytics.pitch import is_valid_pitch_point, pitch_bin, zone_label
-from src.ui.charts import xg_bar
+from src.ui.charts import xg_bar, xg_difference_line, xg_difference_timeline
 
 
 def test_pitch_point_validation() -> None:
@@ -105,3 +105,53 @@ def test_xg_bar_has_xg_title() -> None:
     figure = xg_bar([{"team_name": "Germany", "xg": 1.4}, {"team_name": "Mexico", "xg": 0.8}])
 
     assert figure.layout.title.text == "xG"
+
+
+def test_xg_difference_timeline_accumulates_away_minus_home() -> None:
+    shots = [
+        {"minute": 3, "team_name": "Home", "shot_statsbomb_xg": 0.2},
+        {"minute": 7, "team_name": "Away", "shot_statsbomb_xg": 0.5},
+        {"minute": 12, "team_name": "Home", "shot_statsbomb_xg": 0.1},
+    ]
+
+    rows = xg_difference_timeline(shots, "Home", "Away")
+
+    assert rows[0]["interval_start"] == 0
+    assert rows[0]["xg_diff"] == -0.2
+    assert rows[0]["cumulative_xg_diff"] == -0.2
+    assert rows[1]["xg_diff"] == 0.5
+    assert rows[1]["cumulative_xg_diff"] == 0.3
+    assert rows[2]["xg_diff"] == -0.1
+    assert rows[2]["cumulative_xg_diff"] == 0.2
+    assert rows[-1]["interval_end"] == 90
+
+
+def test_xg_difference_line_adds_single_series() -> None:
+    rows = xg_difference_timeline(
+        [{"minute": 7, "team_name": "Away", "shot_statsbomb_xg": 0.5}],
+        "Home",
+        "Away",
+    )
+
+    figure = xg_difference_line(rows, "Home", "Away")
+
+    assert figure.layout.title.text == "Diferencial acumulado de xG"
+    assert figure.data[0].name == "Visitante - local"
+
+
+def test_xg_difference_line_marks_goals_and_final_score() -> None:
+    shots = [
+        {"minute": 7, "second": 0, "team_name": "Away", "player_name": "Away Scorer", "shot_outcome_name": "Goal"},
+        {"minute": 22, "second": 30, "team_name": "Home", "player_name": "Home Scorer", "shot_outcome_name": "Goal"},
+    ]
+    rows = xg_difference_timeline(shots, "Home", "Away")
+
+    figure = xg_difference_line(rows, "Home", "Away", shots=shots, home_score=1, away_score=1)
+    traces_by_name = {trace.name: trace for trace in figure.data}
+
+    assert traces_by_name["Goles visitante (Away)"].marker.symbol == "star"
+    assert traces_by_name["Goles visitante (Away)"].y[0] > 0
+    assert traces_by_name["Goles local (Home)"].marker.symbol == "star"
+    assert traces_by_name["Goles local (Home)"].y[0] < 0
+    assert any(trace.text and list(trace.text) == ["Visitante 1"] for trace in figure.data)
+    assert any(trace.text and list(trace.text) == ["Local 1"] for trace in figure.data)

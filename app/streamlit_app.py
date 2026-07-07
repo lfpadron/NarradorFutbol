@@ -13,8 +13,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config import ANALYTICS_DB
 from src.security.streamlit_auth import require_login
 from src.ui.footer import render_footer
+from src.ui.page_config import soccer_page_icon
 
-st.set_page_config(page_title="Narrador Inteligente de Futbol", layout="wide")
+st.set_page_config(page_title="Narrador Inteligente de Futbol", page_icon=soccer_page_icon(), layout="wide")
 require_login()
 
 

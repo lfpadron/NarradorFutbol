@@ -11,8 +11,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.security.streamlit_auth import render_login_page
 from src.ui.footer import render_footer
+from src.ui.page_config import soccer_page_icon
 
-st.set_page_config(page_title="Login", layout="centered")
+st.set_page_config(page_title="Login", page_icon=soccer_page_icon(), layout="centered")
 st.title("Login")
 render_login_page()
 render_footer()

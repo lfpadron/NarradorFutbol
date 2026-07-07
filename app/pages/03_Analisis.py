@@ -66,10 +66,11 @@ from src.scouting.scouting_report import save_scouting_report
 from src.scouting.scouting_v2 import generate_scouting_v2
 from src.scouting.scouting_v2_report import save_scouting_v2_report
 from src.security.streamlit_auth import require_login
-from src.ui.charts import momentum_line, shots_on_target_bar, xg_bar
+from src.ui.charts import momentum_line, shots_on_target_bar, xg_bar, xg_difference_line, xg_difference_timeline
 from src.ui.downloads import render_download_button, render_export_downloads
 from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_pct, format_score
+from src.ui.page_config import soccer_page_icon
 from src.ui.pitch_charts import (
     plot_cumulative_xg,
     plot_pass_network,
@@ -78,7 +79,7 @@ from src.ui.pitch_charts import (
     plot_shot_map,
 )
 
-st.set_page_config(page_title="Análisis", layout="wide")
+st.set_page_config(page_title="Análisis", page_icon=soccer_page_icon(), layout="wide")
 require_login()
 st.title("Análisis")
 
@@ -228,6 +229,7 @@ tabs = st.tabs(
         "Scouting AI v2",
         "Momentos clave",
         "Datos",
+        "xG visitante-local",
     ]
 )
 
@@ -1979,5 +1981,48 @@ with tabs[13]:
     analysis_context_path = st.session_state.get(analysis_context_path_key)
     if analysis_context_path:
         render_download_button(analysis_context_path, "JSON", f"analysis_context_download_{match_id}")
+
+with tabs[14]:
+    st.subheader("xG visitante-local")
+    xg_diff_rows = xg_difference_timeline(detail["shots"], home_team, away_team)
+    xg_diff_fig = xg_difference_line(
+        xg_diff_rows,
+        home_team,
+        away_team,
+        shots=detail["shots"],
+        home_score=int(summary.get("home_score") or 0),
+        away_score=int(summary.get("away_score") or 0),
+    )
+    final_diff = xg_diff_rows[-1]["cumulative_xg_diff"] if xg_diff_rows else 0
+    total_home_xg = sum(float(row.get("home_xg") or 0) for row in xg_diff_rows)
+    total_away_xg = sum(float(row.get("away_xg") or 0) for row in xg_diff_rows)
+
+    xg_diff_cols = st.columns(3)
+    xg_diff_cols[0].metric("Visitante - local", format_float(final_diff))
+    xg_diff_cols[1].metric(f"xG visitante ({away_team})", format_float(total_away_xg))
+    xg_diff_cols[2].metric(f"xG local ({home_team})", format_float(total_home_xg))
+
+    st.plotly_chart(xg_diff_fig, width="stretch")
+    st.dataframe(pd.DataFrame(xg_diff_rows), width="stretch")
+    render_tab_pdf_button(
+        "xg_visitante_local",
+        match_id,
+        f"xG visitante-local | {match_score_label}",
+        [
+            {
+                "heading": "Resumen",
+                "rows": [
+                    {
+                        "xg_visitante": format_float(total_away_xg),
+                        "xg_local": format_float(total_home_xg),
+                        "diferencial_final": format_float(final_diff),
+                    }
+                ],
+            },
+            {"heading": "Intervalos de 5 minutos", "rows": table_rows(xg_diff_rows, limit=30)},
+        ],
+        [xg_diff_fig],
+        key=f"export_pdf_xg_visitante_local_{match_id}",
+    )
 
 render_footer()
