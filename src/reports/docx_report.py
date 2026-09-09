@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from src.reports.branding import add_docx_footer
+from src.ui.i18n import is_english
 
 
 def render_docx_report(report: dict[str, Any], output_path: str) -> dict[str, Any]:
@@ -31,7 +32,8 @@ def render_docx_report(report: dict[str, Any], output_path: str) -> dict[str, An
             style.font.name = "Arial"
             style.font.color.rgb = RGBColor(15, 90, 84)
 
-        title = document.add_heading("Reporte del partido", level=0)
+        english = is_english(report.get("language"))
+        title = document.add_heading("Match Report" if english else "Reporte del partido", level=0)
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         _add_metadata(document, report)
@@ -64,18 +66,19 @@ def render_docx_report(report: dict[str, Any], output_path: str) -> dict[str, An
 def _add_metadata(document: Any, report: dict[str, Any]) -> None:
     summary = report.get("match_summary", {})
     metadata = report.get("match_metadata", {})
-    document.add_heading("Datos generales", level=1)
+    english = is_english(report.get("language"))
+    document.add_heading("General Data" if english else "Datos generales", level=1)
     rows = [
-        ("Competencia", metadata.get("competition_name")),
-        ("Temporada", metadata.get("season_name")),
-        ("Fecha", summary.get("match_date") or metadata.get("match_date")),
-        ("Partido", _score_line(summary)),
-        ("Marcador", f"{summary.get('home_score')}-{summary.get('away_score')}"),
+        ("Competition" if english else "Competencia", metadata.get("competition_name")),
+        ("Season" if english else "Temporada", metadata.get("season_name")),
+        ("Date" if english else "Fecha", summary.get("match_date") or metadata.get("match_date")),
+        ("Match" if english else "Partido", _score_line(summary)),
+        ("Score" if english else "Marcador", f"{summary.get('home_score')}-{summary.get('away_score')}"),
         ("Match ID", summary.get("match_id") or report.get("match_id")),
-        ("Estadio", metadata.get("stadium_name")),
-        ("Arbitro", metadata.get("referee_name")),
+        ("Stadium" if english else "Estadio", metadata.get("stadium_name")),
+        ("Referee" if english else "Arbitro", metadata.get("referee_name")),
     ]
-    _add_key_value_table(document, rows)
+    _add_key_value_table(document, rows, english=english)
 
 
 def _add_executive_summary(document: Any, report: dict[str, Any]) -> None:
@@ -83,7 +86,16 @@ def _add_executive_summary(document: Any, report: dict[str, Any]) -> None:
     analytics = report.get("analytics", {})
     dominance = analytics.get("dominance", [])
     leader = dominance[0] if dominance else {}
-    document.add_heading("Resumen ejecutivo", level=1)
+    english = is_english(report.get("language"))
+    document.add_heading("Executive Summary" if english else "Resumen ejecutivo", level=1)
+    if english:
+        document.add_paragraph(
+            f"{_score_line(summary)}. The winner was {summary.get('winner_team_name', 'N/D')}. "
+            f"Estimated dominance favored {leader.get('team_name', 'N/D')} "
+            f"with a score of {leader.get('dominance_score', 'N/D')}. The report consolidates "
+            "statistics, advanced analysis, AI narrative, narrative quality, and traceability."
+        )
+        return
     document.add_paragraph(
         f"{_score_line(summary)}. El ganador fue {summary.get('winner_team_name', 'N/D')}. "
         f"El dominio estimado favoreció a {leader.get('team_name', 'N/D')} "
@@ -100,7 +112,8 @@ def _add_team_stats(document: Any, report: dict[str, Any]) -> None:
     possessions_by_team = (
         possession_summary.get("possessions_by_team", {}) if isinstance(possession_summary, dict) else {}
     )
-    document.add_heading("Estadísticas principales", level=1)
+    english = is_english(report.get("language"))
+    document.add_heading("Main Statistics" if english else "Estadísticas principales", level=1)
     rows = []
     for team in team_stats:
         name = str(team.get("team_name"))
@@ -118,7 +131,11 @@ def _add_team_stats(document: Any, report: dict[str, Any]) -> None:
         )
     _add_table(
         document,
-        ["Equipo", "Tiros", "Goles", "xG", "Pases", "Precisión", "Posesiones", "Ataques peligrosos"],
+        (
+            ["Team", "Shots", "Goals", "xG", "Passes", "Accuracy", "Possessions", "Dangerous attacks"]
+            if english
+            else ["Equipo", "Tiros", "Goles", "xG", "Pases", "Precisión", "Posesiones", "Ataques peligrosos"]
+        ),
         rows,
     )
 
@@ -128,12 +145,21 @@ def _add_dominance(document: Any, report: dict[str, Any]) -> None:
     summary = report.get("match_summary", {})
     dominance = analytics.get("dominance", [])
     xg_breakdown = analytics.get("xg_breakdown", [])
-    document.add_heading("Lectura del dominio", level=1)
+    english = is_english(report.get("language"))
+    document.add_heading("Dominance Read" if english else "Lectura del dominio", level=1)
     if not dominance:
-        document.add_paragraph("No hay datos de dominio disponibles.")
+        document.add_paragraph("No dominance data is available." if english else "No hay datos de dominio disponibles.")
         return
     leader = dominance[0]
     xg_text = ", ".join(f"{row.get('team_name')} xG {row.get('xg_total')}" for row in xg_breakdown)
+    if english:
+        document.add_paragraph(
+            f"The dominant team by volume was {leader.get('team_name')}, with "
+            f"{leader.get('shots')} shots, {leader.get('final_third_entries')} final-third entries "
+            f"and a dominance score of {leader.get('dominance_score')}. In xG: {xg_text}. "
+            f"The winner was {summary.get('winner_team_name')}, a signal of efficiency against territorial dominance."
+        )
+        return
     document.add_paragraph(
         f"El equipo dominante por volumen fue {leader.get('team_name')}, con "
         f"{leader.get('shots')} tiros, {leader.get('final_third_entries')} entradas al último tercio "
@@ -143,23 +169,27 @@ def _add_dominance(document: Any, report: dict[str, Any]) -> None:
 
 
 def _add_key_moments(document: Any, report: dict[str, Any]) -> None:
-    document.add_heading("Momentos clave", level=1)
+    english = is_english(report.get("language"))
+    document.add_heading("Key Moments" if english else "Momentos clave", level=1)
     key_moments = report.get("analytics", {}).get("key_moments", [])
     if not key_moments:
-        document.add_paragraph("No se detectaron momentos clave.")
+        document.add_paragraph("No key moments were detected." if english else "No se detectaron momentos clave.")
         return
     rows = []
     for moment in key_moments:
         second = int(moment.get("second") or 0)
         rows.append([f"{moment.get('minute')}:{second:02d}", moment.get("type"), moment.get("title")])
-    _add_table(document, ["Minuto", "Tipo", "Descripción"], rows)
+    _add_table(document, ["Minute", "Type", "Description"] if english else ["Minuto", "Tipo", "Descripción"], rows)
 
 
 def _add_impact_players(document: Any, report: dict[str, Any]) -> None:
-    document.add_heading("Jugadores destacados", level=1)
+    english = is_english(report.get("language"))
+    document.add_heading("Standout Players" if english else "Jugadores destacados", level=1)
     players = report.get("analytics", {}).get("impact_players", [])
     if not players:
-        document.add_paragraph("No hay jugadores destacados disponibles.")
+        document.add_paragraph(
+            "No standout players are available." if english else "No hay jugadores destacados disponibles."
+        )
         return
     rows = []
     for player in players[:10]:
@@ -175,12 +205,22 @@ def _add_impact_players(document: Any, report: dict[str, Any]) -> None:
                 player.get("key_passes"),
             ]
         )
-    _add_table(document, ["Jugador", "Equipo", "Score", "Goles", "Asist.", "Tiros", "xG", "Pases clave"], rows)
+    _add_table(
+        document,
+        (
+            ["Player", "Team", "Score", "Goals", "Assists", "Shots", "xG", "Key passes"]
+            if english
+            else ["Jugador", "Equipo", "Score", "Goles", "Asist.", "Tiros", "xG", "Pases clave"]
+        ),
+        rows,
+    )
 
 
 def _add_narrative(document: Any, report: dict[str, Any]) -> None:
-    document.add_heading("Narración AI", level=1)
-    narrative = str(report.get("narrative", {}).get("narrative_markdown") or "Narración no disponible.")
+    english = is_english(report.get("language"))
+    document.add_heading("AI Narrative" if english else "Narración AI", level=1)
+    fallback = "Narrative unavailable." if english else "Narración no disponible."
+    narrative = str(report.get("narrative", {}).get("narrative_markdown") or fallback)
     for line in narrative.splitlines():
         clean = line.strip()
         if not clean:
@@ -196,17 +236,29 @@ def _add_narrative(document: Any, report: dict[str, Any]) -> None:
 
 
 def _add_quality(document: Any, report: dict[str, Any]) -> None:
-    document.add_heading("Evaluación de calidad narrativa", level=1)
+    english = is_english(report.get("language"))
+    document.add_heading("Narrative Quality Evaluation" if english else "Evaluación de calidad narrativa", level=1)
     quality = report.get("quality", {})
-    rows = [
-        ["Overall", quality.get("overall_score")],
-        ["Factualidad", quality.get("factuality_score")],
-        ["Cobertura", quality.get("coverage_score")],
-        ["Claridad", quality.get("clarity_score")],
-        ["Emoción", quality.get("excitement_score")],
-        ["Profundidad táctica", quality.get("tactical_depth_score")],
-    ]
-    _add_table(document, ["Métrica", "Score"], rows)
+    rows = (
+        [
+            ["Overall", quality.get("overall_score")],
+            ["Factuality", quality.get("factuality_score")],
+            ["Coverage", quality.get("coverage_score")],
+            ["Clarity", quality.get("clarity_score")],
+            ["Excitement", quality.get("excitement_score")],
+            ["Tactical depth", quality.get("tactical_depth_score")],
+        ]
+        if english
+        else [
+            ["Overall", quality.get("overall_score")],
+            ["Factualidad", quality.get("factuality_score")],
+            ["Cobertura", quality.get("coverage_score")],
+            ["Claridad", quality.get("clarity_score")],
+            ["Emoción", quality.get("excitement_score")],
+            ["Profundidad táctica", quality.get("tactical_depth_score")],
+        ]
+    )
+    _add_table(document, ["Metric", "Score"] if english else ["Métrica", "Score"], rows)
     warnings = quality.get("warnings", [])
     if warnings:
         document.add_heading("Warnings", level=2)
@@ -215,32 +267,46 @@ def _add_quality(document: Any, report: dict[str, Any]) -> None:
 
 
 def _add_validation(document: Any, report: dict[str, Any]) -> None:
-    document.add_heading("Validación futbolística", level=1)
+    english = is_english(report.get("language"))
+    document.add_heading("Football Validation" if english else "Validación futbolística", level=1)
     validation = report.get("analytics", {}).get("validation", {})
     document.add_paragraph(f"Status: {validation.get('status', 'N/D')}")
     findings = validation.get("findings", [])
     if findings:
         rows = [[f.get("severity"), f.get("message"), f.get("rows")] for f in findings]
-        _add_table(document, ["Severidad", "Hallazgo", "Filas"], rows)
+        _add_table(document, ["Severity", "Finding", "Rows"] if english else ["Severidad", "Hallazgo", "Filas"], rows)
     else:
-        document.add_paragraph("Sin hallazgos.")
+        document.add_paragraph("No findings." if english else "Sin hallazgos.")
 
 
 def _add_traceability(document: Any, report: dict[str, Any]) -> None:
-    document.add_heading("Trazabilidad", level=1)
-    items = [
-        "Fuente: StatsBomb Open Data.",
-        "Raw JSON preservado en data/raw/ sin modificaciones analíticas.",
-        "DuckDB analítico: data/analytics/statsbomb.duckdb.",
-        "Contexto AI curado desde src/analytics/ai_context.py.",
-        f"Fecha de generación: {report.get('generated_at')}.",
-    ]
+    english = is_english(report.get("language"))
+    document.add_heading("Traceability" if english else "Trazabilidad", level=1)
+    items = (
+        [
+            "Source: StatsBomb Open Data.",
+            "Raw JSON preserved in data/raw/ without analytical modifications.",
+            "Analytical DuckDB: data/analytics/statsbomb.duckdb.",
+            "AI context curated from src/analytics/ai_context.py.",
+            f"Generated at: {report.get('generated_at')}.",
+        ]
+        if english
+        else [
+            "Fuente: StatsBomb Open Data.",
+            "Raw JSON preservado en data/raw/ sin modificaciones analíticas.",
+            "DuckDB analítico: data/analytics/statsbomb.duckdb.",
+            "Contexto AI curado desde src/analytics/ai_context.py.",
+            f"Fecha de generación: {report.get('generated_at')}.",
+        ]
+    )
     for item in items:
         document.add_paragraph(item, style="List Bullet")
 
 
-def _add_key_value_table(document: Any, rows: list[tuple[str, Any]]) -> None:
-    _add_table(document, ["Campo", "Valor"], [[key, _value(value)] for key, value in rows])
+def _add_key_value_table(document: Any, rows: list[tuple[str, Any]], english: bool = False) -> None:
+    _add_table(
+        document, ["Field", "Value"] if english else ["Campo", "Valor"], [[key, _value(value)] for key, value in rows]
+    )
 
 
 def _add_table(document: Any, headers: list[str], rows: list[list[Any]]) -> None:

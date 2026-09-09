@@ -6,6 +6,8 @@ from typing import Any
 
 import plotly.graph_objects as go
 
+from src.ui.i18n import is_english, t
+
 PITCH_LENGTH = 120.0
 PITCH_WIDTH = 80.0
 
@@ -35,11 +37,15 @@ def pitch_bin(
 
 
 def zone_label(x_bin: int, y_bin: int, x_bins: int = 6, y_bins: int = 4) -> str:
-    thirds = ("defensiva", "media", "ofensiva")
-    lanes = ("izquierda", "centro-izquierda", "centro-derecha", "derecha")
+    thirds = ("defensive", "middle", "attacking") if is_english() else ("defensiva", "media", "ofensiva")
+    lanes = (
+        ("left", "center-left", "center-right", "right")
+        if is_english()
+        else ("izquierda", "centro-izquierda", "centro-derecha", "derecha")
+    )
     third_index = min(2, int(x_bin / max(x_bins, 1) * 3))
     lane_index = min(y_bins - 1, max(0, y_bin))
-    lane = lanes[lane_index] if y_bins == 4 else f"carril {lane_index + 1}"
+    lane = lanes[lane_index] if y_bins == 4 else f"{t('carril')} {lane_index + 1}"
     return f"{thirds[third_index]} | {lane}"
 
 
@@ -47,11 +53,11 @@ def build_pitch_figure(title: str) -> go.Figure:
     figure = go.Figure()
     _add_pitch_shapes(figure)
     figure.update_layout(
-        title=title,
+        title=t(title),
         template="plotly_white",
         height=620,
         margin={"l": 20, "r": 20, "t": 55, "b": 20},
-        legend_title_text="Equipo",
+        legend_title_text=t("Equipo"),
         plot_bgcolor="#eef5f1",
         paper_bgcolor="white",
     )
@@ -62,7 +68,7 @@ def build_pitch_figure(title: str) -> go.Figure:
 
 def annotate_empty(figure: go.Figure, message: str) -> go.Figure:
     figure.add_annotation(
-        text=message,
+        text=t(message),
         x=PITCH_LENGTH / 2,
         y=PITCH_WIDTH / 2,
         showarrow=False,

@@ -18,11 +18,14 @@ from src.reports.branding import add_report_footer_to_html, draw_reportlab_foote
 
 def render_pdf_report(html: str, output_path: str) -> dict[str, Any]:
     path = Path(output_path)
+    english = _html_is_english(html)
     if not html.strip():
         return {
             "status": "failed",
             "path": path.as_posix(),
-            "error_message": "HTML vacio; no se puede generar PDF.",
+            "error_message": (
+                "HTML is empty; PDF cannot be generated." if english else "HTML vacio; no se puede generar PDF."
+            ),
             "warning_message": None,
             "backend": None,
         }
@@ -43,10 +46,12 @@ def render_pdf_report(html: str, output_path: str) -> dict[str, Any]:
             "backend": "weasyprint",
         }
     except Exception as weasyprint_exc:
-        fallback_result = _render_reportlab_pdf(html, path)
+        fallback_result = _render_reportlab_pdf(html, path, english=english)
         if fallback_result["status"] == "generated":
             fallback_result["warning_message"] = (
-                "WeasyPrint no esta disponible en este entorno; " "se genero el PDF con el fallback ReportLab."
+                "WeasyPrint is not available in this environment; the PDF was generated with the ReportLab fallback."
+                if english
+                else "WeasyPrint no esta disponible en este entorno; se genero el PDF con el fallback ReportLab."
             )
             fallback_result["weasyprint_error_message"] = str(weasyprint_exc)
             return fallback_result
@@ -60,7 +65,7 @@ def render_pdf_report(html: str, output_path: str) -> dict[str, Any]:
         }
 
 
-def _render_reportlab_pdf(html: str, path: Path) -> dict[str, Any]:
+def _render_reportlab_pdf(html: str, path: Path, english: bool = False) -> dict[str, Any]:
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
@@ -147,15 +152,24 @@ def _render_reportlab_pdf(html: str, path: Path) -> dict[str, Any]:
                 story.append(Paragraph(escape(str(payload)), body_style))
 
         if not story:
-            story.append(Paragraph("Reporte sin contenido renderizable.", body_style))
+            story.append(
+                Paragraph(
+                    "Report has no renderable content." if english else "Reporte sin contenido renderizable.",
+                    body_style,
+                )
+            )
 
-        written_path, warning_message = _prepare_pdf_output_path(path)
+        written_path, warning_message = _prepare_pdf_output_path(path, english=english)
         try:
             _write_reportlab_document(written_path, story, margin, letter, SimpleDocTemplate)
         except PermissionError:
             written_path = _alternate_pdf_path(path)
             _write_reportlab_document(written_path, story, margin, letter, SimpleDocTemplate)
-            warning_message = f"No se pudo sobrescribir {path.name}; " f"se genero {written_path.name}."
+            warning_message = (
+                f"Could not overwrite {path.name}; generated {written_path.name}."
+                if english
+                else f"No se pudo sobrescribir {path.name}; se genero {written_path.name}."
+            )
 
         return {
             "status": "generated",
@@ -193,7 +207,7 @@ def _write_reportlab_document(
     document.build(list(story), onFirstPage=draw_reportlab_footer, onLaterPages=draw_reportlab_footer)
 
 
-def _prepare_pdf_output_path(path: Path) -> tuple[Path, str | None]:
+def _prepare_pdf_output_path(path: Path, english: bool = False) -> tuple[Path, str | None]:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("ab"):
@@ -203,7 +217,11 @@ def _prepare_pdf_output_path(path: Path) -> tuple[Path, str | None]:
         alternate_path = _alternate_pdf_path(path)
         return (
             alternate_path,
-            f"No se pudo sobrescribir {path.name}; se genero {alternate_path.name}.",
+            (
+                f"Could not overwrite {path.name}; generated {alternate_path.name}."
+                if english
+                else f"No se pudo sobrescribir {path.name}; se genero {alternate_path.name}."
+            ),
         )
 
 
@@ -362,3 +380,7 @@ class _ReportHTMLParser(HTMLParser):
 
 def _clean_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
+
+
+def _html_is_english(html: str) -> bool:
+    return bool(re.search(r"<html[^>]+lang=[\"']en[\"']", html, flags=re.IGNORECASE))

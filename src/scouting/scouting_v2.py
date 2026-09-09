@@ -8,6 +8,7 @@ from typing import Any
 from src.ingestion.utils import to_jsonable
 from src.scouting.scouting_language_guard import sanitize_scouting_language, validate_scouting_language
 from src.scouting.tactical_profile import build_tactical_profile
+from src.ui.i18n import is_english, translate_text
 
 
 def generate_scouting_v2(
@@ -15,17 +16,22 @@ def generate_scouting_v2(
     player_id_a: int,
     match_id_b: int | None = None,
     player_id_b: int | None = None,
+    language: str = "es",
 ) -> dict[str, Any]:
     has_player_b = match_id_b is not None and player_id_b is not None
     profile_a = build_tactical_profile(match_id_a, player_id_a)
     profile_b = build_tactical_profile(int(match_id_b), int(player_id_b)) if has_player_b else None
     mode = "comparativo" if has_player_b else "individual"
-    comparison = _compare_profiles(profile_a, profile_b) if profile_b else None
-    narrative = _build_narrative(profile_a, profile_b, comparison)
+    comparison = _compare_profiles(profile_a, profile_b, language=language) if profile_b else None
+    narrative = _build_narrative(profile_a, profile_b, comparison, language=language)
     language_warnings = validate_scouting_language(narrative)
     clean_narrative = sanitize_scouting_language(narrative)
     if clean_narrative != narrative:
-        language_warnings.append("Se ajustó lenguaje no profesional antes de entregar el reporte.")
+        language_warnings.append(
+            "Non-professional wording was adjusted before delivering the report."
+            if is_english(language)
+            else "Se ajustó lenguaje no profesional antes de entregar el reporte."
+        )
     narrative = clean_narrative
     residual_language_warnings = validate_scouting_language(narrative)
     language_warnings.extend(warning for warning in residual_language_warnings if warning not in language_warnings)
@@ -39,12 +45,21 @@ def generate_scouting_v2(
             and profile_a.get("position_name") != profile_b.get("position_name")
         ):
             warnings.append(
-                f"Roles observados distintos: {profile_a.get('position_name')} vs {profile_b.get('position_name')}; la comparación debe leerse con cautela."
+                (
+                    f"Different observed roles: {profile_a.get('position_name')} vs {profile_b.get('position_name')}; "
+                    "the comparison should be read with caution."
+                )
+                if is_english(language)
+                else (
+                    f"Roles observados distintos: {profile_a.get('position_name')} vs {profile_b.get('position_name')}; "
+                    "la comparación debe leerse con cautela."
+                )
             )
 
     result = {
         "version": "scouting_ai_v2",
         "mode": mode,
+        "language": language,
         "match_id_a": match_id_a,
         "player_id_a": player_id_a,
         "match_id_b": match_id_b,
@@ -55,7 +70,7 @@ def generate_scouting_v2(
         "profile_a": profile_a,
         "profile_b": profile_b,
         "comparison": comparison,
-        "radar_metrics": _radar_metrics(profile_a, profile_b),
+        "radar_metrics": _radar_metrics(profile_a, profile_b, language=language),
         "narrative_markdown": narrative,
         "warnings": warnings,
         "language_warnings": language_warnings,
@@ -68,16 +83,34 @@ def _build_narrative(
     profile_a: dict[str, Any],
     profile_b: dict[str, Any] | None,
     comparison: dict[str, Any] | None,
+    language: str = "es",
 ) -> str:
     player_name = profile_a.get("player_name")
     primary = profile_a.get("primary_archetype", {})
     secondary = profile_a.get("secondary_archetype", {})
-    strengths = _list_text(profile_a.get("strengths", []))
-    weaknesses = _list_text(profile_a.get("weaknesses", []))
+    strengths = _list_text(profile_a.get("strengths", []), language=language)
+    weaknesses = _list_text(profile_a.get("weaknesses", []), language=language)
 
     comparison_section = ""
     if profile_b and comparison:
-        comparison_section = f"""
+        if is_english(language):
+            comparison_section = f"""
+## Archetype Comparison
+
+**Similarities:**
+
+{_list_text(comparison.get('similarities', []), language=language)}
+
+**Differences:**
+
+{_list_text(comparison.get('differences', []), language=language)}
+
+**Complementarity:**
+
+{_list_text(comparison.get('complementarity', []), language=language)}
+"""
+        else:
+            comparison_section = f"""
 ## Comparación de arquetipos
 
 **Similitudes:**
@@ -91,6 +124,39 @@ def _build_narrative(
 **Complementariedad:**
 
 {_list_text(comparison.get('complementarity', []))}
+"""
+
+    if is_english(language):
+        return f"""# Scouting AI v2
+
+## Tactical Profile
+
+{player_name} profiles as **{translate_text(primary.get('name'), language=language)}** from metrics observed in this match. This read does not try to guess the player's official position; it infers the behaviors that carried the most weight: attack {translate_text(profile_a.get('attack_profile', {}).get('label'), language=language)}, creation {translate_text(profile_a.get('creation_profile', {}).get('label'), language=language)}, progression {translate_text(profile_a.get('progression_profile', {}).get('label'), language=language)}, defensive phase {translate_text(profile_a.get('defensive_profile', {}).get('label'), language=language)}, and impact {translate_text(profile_a.get('impact_profile', {}).get('label'), language=language)}.
+
+## Primary Archetype
+
+**{translate_text(primary.get('name'), language=language)}** with confidence {primary.get('score')}/100. {translate_text(primary.get('description'), language=language)} The signal comes from metrics such as {_metric_names(primary, language=language)}.
+
+## Secondary Archetype
+
+**{translate_text(secondary.get('name'), language=language)}** with score {secondary.get('score')}/100. This second profile suggests a complementary read, not an absolute label.
+
+## Observed Strengths
+
+{strengths}
+
+## Observed Limitations
+
+{weaknesses}
+
+## Recommended Use
+
+{_recommended_use(profile_a, language=language)}
+
+## Interpretation Risks
+
+This profile is based on one match and available events; it does not project career, market, or future fit as fact. If the observed role differs from the player's usual role, the read should be validated with more matches and video.
+{comparison_section}
 """
 
     return f"""# Scouting AI v2
@@ -117,7 +183,7 @@ def _build_narrative(
 
 ## Uso recomendado
 
-{_recommended_use(profile_a)}
+{_recommended_use(profile_a, language=language)}
 
 ## Riesgos de interpretación
 
@@ -126,7 +192,7 @@ Este perfil se basa en un partido y en eventos disponibles; no proyecta carrera,
 """
 
 
-def _compare_profiles(profile_a: dict[str, Any], profile_b: dict[str, Any]) -> dict[str, Any]:
+def _compare_profiles(profile_a: dict[str, Any], profile_b: dict[str, Any], language: str = "es") -> dict[str, Any]:
     primary_a = profile_a.get("primary_archetype", {})
     primary_b = profile_b.get("primary_archetype", {})
     strengths_a = set(profile_a.get("strengths", []))
@@ -134,15 +200,37 @@ def _compare_profiles(profile_a: dict[str, Any], profile_b: dict[str, Any]) -> d
     shared_strengths = sorted(strengths_a & strengths_b)
     similarities = []
     if primary_a.get("name") == primary_b.get("name"):
-        similarities.append(f"Ambos se acercan al arquetipo {primary_a.get('name')}.")
+        similarities.append(
+            f"Both are close to the {translate_text(primary_a.get('name'), language=language)} archetype."
+            if is_english(language)
+            else f"Ambos se acercan al arquetipo {primary_a.get('name')}."
+        )
     if shared_strengths:
-        similarities.append("Comparten señales en: " + ", ".join(shared_strengths) + ".")
+        similarities.append(
+            "They share signals in: "
+            + ", ".join(str(translate_text(value, language=language)) for value in shared_strengths)
+            + "."
+            if is_english(language)
+            else "Comparten señales en: " + ", ".join(shared_strengths) + "."
+        )
     if not similarities:
-        similarities.append("No comparten un arquetipo principal claro; la comparación es principalmente de contraste.")
+        similarities.append(
+            "They do not share a clear primary archetype; the comparison is mainly contrastive."
+            if is_english(language)
+            else "No comparten un arquetipo principal claro; la comparación es principalmente de contraste."
+        )
 
-    differences = [
-        f"{profile_a.get('player_name')} se acerca a {primary_a.get('name')} ({primary_a.get('score')}/100), mientras {profile_b.get('player_name')} se acerca a {primary_b.get('name')} ({primary_b.get('score')}/100)."
-    ]
+    differences = (
+        [
+            f"{profile_a.get('player_name')} is close to {translate_text(primary_a.get('name'), language=language)} "
+            f"({primary_a.get('score')}/100), while {profile_b.get('player_name')} is close to "
+            f"{translate_text(primary_b.get('name'), language=language)} ({primary_b.get('score')}/100)."
+        ]
+        if is_english(language)
+        else [
+            f"{profile_a.get('player_name')} se acerca a {primary_a.get('name')} ({primary_a.get('score')}/100), mientras {profile_b.get('player_name')} se acerca a {primary_b.get('name')} ({primary_b.get('score')}/100)."
+        ]
+    )
     for label, key in (
         ("ataque", "attack_profile"),
         ("creación", "creation_profile"),
@@ -154,12 +242,18 @@ def _compare_profiles(profile_a: dict[str, Any], profile_b: dict[str, Any]) -> d
         score_b = _number(profile_b.get(key, {}).get("score"))
         if abs(score_a - score_b) >= 15:
             leader = profile_a.get("player_name") if score_a > score_b else profile_b.get("player_name")
-            differences.append(f"Mayor señal de {label}: {leader}.")
+            differences.append(
+                f"Stronger {translate_text(label, language=language)} signal: {leader}."
+                if is_english(language)
+                else f"Mayor señal de {label}: {leader}."
+            )
 
     complementarity = []
     if profile_a.get("archetype") != profile_b.get("archetype"):
         complementarity.append(
-            "Perfiles distintos: pueden ser más útiles como roles complementarios que como ranking directo."
+            "Different profiles: they may be more useful as complementary roles than as a direct ranking."
+            if is_english(language)
+            else "Perfiles distintos: pueden ser más útiles como roles complementarios que como ranking directo."
         )
     attack_a = _number(profile_a.get("attack_profile", {}).get("score"))
     attack_b = _number(profile_b.get("attack_profile", {}).get("score"))
@@ -173,14 +267,28 @@ def _compare_profiles(profile_a: dict[str, Any], profile_b: dict[str, Any]) -> d
     )
     if attack_a >= attack_b + 15 and organization_b >= organization_a + 15:
         complementarity.append(
-            f"{profile_a.get('player_name')} aporta mayor amenaza ofensiva, mientras {profile_b.get('player_name')} aporta más organización o progresión."
+            (
+                f"{profile_a.get('player_name')} brings more attacking threat, while "
+                f"{profile_b.get('player_name')} brings more organization or progression."
+            )
+            if is_english(language)
+            else f"{profile_a.get('player_name')} aporta mayor amenaza ofensiva, mientras {profile_b.get('player_name')} aporta más organización o progresión."
         )
     elif attack_b >= attack_a + 15 and organization_a >= organization_b + 15:
         complementarity.append(
-            f"{profile_b.get('player_name')} aporta mayor amenaza ofensiva, mientras {profile_a.get('player_name')} aporta más organización o progresión."
+            (
+                f"{profile_b.get('player_name')} brings more attacking threat, while "
+                f"{profile_a.get('player_name')} brings more organization or progression."
+            )
+            if is_english(language)
+            else f"{profile_b.get('player_name')} aporta mayor amenaza ofensiva, mientras {profile_a.get('player_name')} aporta más organización o progresión."
         )
     if not complementarity:
-        complementarity.append("La complementariedad debe validarse con contexto táctico y roles de equipo.")
+        complementarity.append(
+            "Complementarity should be validated with tactical context and team roles."
+            if is_english(language)
+            else "La complementariedad debe validarse con contexto táctico y roles de equipo."
+        )
 
     return {
         "similarities": similarities,
@@ -189,8 +297,11 @@ def _compare_profiles(profile_a: dict[str, Any], profile_b: dict[str, Any]) -> d
     }
 
 
-def _radar_metrics(profile_a: dict[str, Any], profile_b: dict[str, Any] | None) -> dict[str, Any]:
-    categories = ["Ataque", "Creación", "Progresión", "Defensa", "Impacto"]
+def _radar_metrics(profile_a: dict[str, Any], profile_b: dict[str, Any] | None, language: str = "es") -> dict[str, Any]:
+    categories = [
+        str(translate_text(category, language=language))
+        for category in ["Ataque", "Creación", "Progresión", "Defensa", "Impacto"]
+    ]
     values_a = [
         profile_a.get("attack_profile", {}).get("score", 0),
         profile_a.get("creation_profile", {}).get("score", 0),
@@ -213,32 +324,49 @@ def _radar_metrics(profile_a: dict[str, Any], profile_b: dict[str, Any] | None) 
             "name": profile_a.get("player_name"),
             "team_name": profile_a.get("team_name"),
             "values": values_a,
-            "raw": _profile_scores(profile_a),
+            "raw": _profile_scores(profile_a, language=language),
         },
         "player_b": {
             "name": profile_b.get("player_name") if profile_b else None,
             "team_name": profile_b.get("team_name") if profile_b else None,
             "values": values_b,
-            "raw": _profile_scores(profile_b) if profile_b else {},
+            "raw": _profile_scores(profile_b, language=language) if profile_b else {},
         },
     }
 
 
-def _profile_scores(profile: dict[str, Any] | None) -> dict[str, Any]:
+def _profile_scores(profile: dict[str, Any] | None, language: str = "es") -> dict[str, Any]:
     if not profile:
         return {}
     return {
-        "Ataque": profile.get("attack_profile", {}).get("score", 0),
-        "Creación": profile.get("creation_profile", {}).get("score", 0),
-        "Progresión": profile.get("progression_profile", {}).get("score", 0),
-        "Defensa": profile.get("defensive_profile", {}).get("score", 0),
-        "Impacto": profile.get("impact_profile", {}).get("score", 0),
+        str(translate_text("Ataque", language=language)): profile.get("attack_profile", {}).get("score", 0),
+        str(translate_text("Creación", language=language)): profile.get("creation_profile", {}).get("score", 0),
+        str(translate_text("Progresión", language=language)): profile.get("progression_profile", {}).get("score", 0),
+        str(translate_text("Defensa", language=language)): profile.get("defensive_profile", {}).get("score", 0),
+        str(translate_text("Impacto", language=language)): profile.get("impact_profile", {}).get("score", 0),
     }
 
 
-def _recommended_use(profile: dict[str, Any]) -> str:
+def _recommended_use(profile: dict[str, Any], language: str = "es") -> str:
     archetype = str(profile.get("archetype") or "")
     name = profile.get("player_name")
+    if is_english(language):
+        if "Extremo" in archetype:
+            return f"Use {name} to attack space, accelerate after recoveries, and receive in zones where they can carry or finish."
+        if archetype in {"Segundo delantero", "Finalizador", "Delantero objetivo"}:
+            return (
+                f"Use {name} close to finishing zones, with freedom to attack intervals and turn advantages into shots."
+            )
+        if archetype in {"Organizador", "Mediocentro constructor"}:
+            return f"Use {name} as a continuity piece: receive, progress, and connect phases with passing volume."
+        if "Recuperador" in archetype or "destructor" in archetype:
+            return f"Use {name} to trigger pressure, sustain duels, and protect zones after turnovers."
+        if "Lateral" in archetype:
+            return f"Use {name} with width, progression, and support responsibilities in the opposition half, while protecting defensive balance."
+        if "Central" in archetype:
+            return f"Use {name} to support build-up or box defending according to the profile's dominant signal."
+        return f"Use {name} according to the observed archetype, validating with more matches before larger decisions."
+
     if "Extremo" in archetype:
         return f"Usar a {name} para atacar espacios, acelerar tras recuperación y recibir en zonas donde pueda conducir o finalizar."
     if archetype in {"Segundo delantero", "Finalizador", "Delantero objetivo"}:
@@ -267,30 +395,54 @@ def _context_summary(profile_a: dict[str, Any], profile_b: dict[str, Any] | None
     }
 
 
-def _metric_names(archetype: dict[str, Any]) -> str:
+def _metric_names(archetype: dict[str, Any], language: str = "es") -> str:
     metrics = archetype.get("metrics", [])
-    labels = {
-        "xg": "xG",
-        "shots": "tiros",
-        "goals": "goles",
-        "impact_score": "impacto",
-        "key_passes": "pases clave",
-        "passes": "pases",
-        "progressive_passes": "pases progresivos",
-        "pass_accuracy_pct": "precisión de pase",
-        "events": "volumen de eventos",
-        "pressures": "presiones",
-        "duels": "duelos",
-        "carries": "conducciones",
-        "carry_distance": "distancia en conducción",
-    }
-    return ", ".join(labels.get(metric, str(metric)) for metric in metrics) or "métricas observadas"
+    labels = (
+        {
+            "xg": "xG",
+            "shots": "shots",
+            "goals": "goals",
+            "impact_score": "impact",
+            "key_passes": "key passes",
+            "passes": "passes",
+            "progressive_passes": "progressive passes",
+            "pass_accuracy_pct": "pass accuracy",
+            "events": "event volume",
+            "pressures": "pressures",
+            "duels": "duels",
+            "carries": "carries",
+            "carry_distance": "carry distance",
+        }
+        if is_english(language)
+        else {
+            "xg": "xG",
+            "shots": "tiros",
+            "goals": "goles",
+            "impact_score": "impacto",
+            "key_passes": "pases clave",
+            "passes": "pases",
+            "progressive_passes": "pases progresivos",
+            "pass_accuracy_pct": "precisión de pase",
+            "events": "volumen de eventos",
+            "pressures": "presiones",
+            "duels": "duelos",
+            "carries": "conducciones",
+            "carry_distance": "distancia en conducción",
+        }
+    )
+    return ", ".join(labels.get(metric, str(metric)) for metric in metrics) or (
+        "observed metrics" if is_english(language) else "métricas observadas"
+    )
 
 
-def _list_text(values: list[Any]) -> str:
+def _list_text(values: list[Any], language: str = "es") -> str:
     if not values:
-        return "No hay señales dominantes suficientes; conviene ampliar muestra."
-    return "\n".join(f"- {value}" for value in values)
+        return (
+            "There are not enough dominant signals; the sample should be expanded."
+            if is_english(language)
+            else "No hay señales dominantes suficientes; conviene ampliar muestra."
+        )
+    return "\n".join(f"- {translate_text(value, language=language)}" for value in values)
 
 
 def _number(value: Any) -> float:

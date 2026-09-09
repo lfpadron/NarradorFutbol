@@ -7,6 +7,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from src.ui.i18n import t
+
 HOME_COLOR = "#d62728"
 HOME_LIGHT = "#f3a5a5"
 AWAY_COLOR = "#1f77b4"
@@ -18,12 +20,14 @@ def shot_count_bar(team_stats: list[dict[str, Any]]) -> go.Figure:
     frame = pd.DataFrame(team_stats)
     if frame.empty:
         return _empty_figure("Sin tiros")
-    return px.bar(frame, x="team_name", y="shots", labels={"team_name": "Equipo", "shots": "Tiros"})
+    return px.bar(frame, x="team_name", y="shots", labels={"team_name": t("Equipo"), "shots": t("Tiros")})
 
 
 def shots_on_target_bar(shots: list[dict[str, Any]], home_team: str, away_team: str) -> go.Figure:
     frame = pd.DataFrame(shots)
-    teams = _ordered_teams(frame["team_name"].dropna().unique().tolist() if not frame.empty else [], home_team, away_team)
+    teams = _ordered_teams(
+        frame["team_name"].dropna().unique().tolist() if not frame.empty else [], home_team, away_team
+    )
     if frame.empty or "shot_outcome_name" not in frame.columns or not teams:
         return _empty_figure("Sin tiros a gol")
 
@@ -53,35 +57,35 @@ def shots_on_target_bar(shots: list[dict[str, Any]], home_team: str, away_team: 
         go.Bar(
             x=labels,
             y=goals,
-            name="Goles",
+            name=t("Goles"),
             marker={"color": strong_colors},
             text=[_bar_text(value) for value in goals],
             textposition="inside",
             insidetextanchor="middle",
             textfont={"color": "white", "size": 13},
-            hovertemplate="%{x}<br>Goles: %{y}<extra></extra>",
+            hovertemplate=f"%{{x}}<br>{t('Goles')}: %{{y}}<extra></extra>",
         )
     )
     figure.add_trace(
         go.Bar(
             x=labels,
             y=on_target_without_goal,
-            name="Tiros a gol sin gol",
+            name=t("Tiros a gol sin gol"),
             marker={"color": light_colors},
             text=[_bar_text(value) for value in on_target_without_goal],
             textposition="inside",
             insidetextanchor="middle",
             textfont={"color": "#10243a", "size": 13},
-            hovertemplate="%{x}<br>Tiros a gol sin gol: %{y}<extra></extra>",
+            hovertemplate=f"%{{x}}<br>{t('Tiros a gol sin gol')}: %{{y}}<extra></extra>",
         )
     )
     figure.update_layout(
-        title="Tiros a gol",
+        title=t("Tiros a gol"),
         barmode="stack",
-        xaxis_title="Equipo",
-        yaxis_title="Eventos",
+        xaxis_title=t("Equipo"),
+        yaxis_title=t("Eventos"),
         template="plotly_white",
-        legend_title_text="Tipo",
+        legend_title_text=t("Tipo"),
         uniformtext_minsize=10,
         uniformtext_mode="show",
         legend={
@@ -100,7 +104,7 @@ def xg_bar(team_stats: list[dict[str, Any]], home_team: str | None = None, away_
     frame = pd.DataFrame(team_stats)
     if frame.empty:
         return _empty_figure("Sin xG")
-    figure = px.bar(frame, x="team_name", y="xg", labels={"team_name": "Equipo", "xg": "xG"})
+    figure = px.bar(frame, x="team_name", y="xg", labels={"team_name": t("Equipo"), "xg": "xG"})
     if home_team or away_team:
         figure.update_traces(marker_color=[_team_color(team, home_team, away_team) for team in frame["team_name"]])
     figure.update_layout(title="xG")
@@ -197,13 +201,15 @@ def xg_difference_line(
             marker={"size": 7, "color": "#0D6B5F"},
             customdata=frame[["interval_start", "interval_end", "home_xg", "away_xg", "xg_diff"]],
             hovertemplate=(
-                "Intervalo %{customdata[0]}-%{customdata[1]} min<br>"
-                f"xG local ({home_team}): " "%{customdata[2]:.2f}<br>"
-                f"xG visitante ({away_team}): " "%{customdata[3]:.2f}<br>"
-                "Diferencia del intervalo: %{customdata[4]:.2f}<br>"
-                "Diferencial acumulado: %{y:.2f}<extra></extra>"
+                f"{t('Intervalo')} %{{customdata[0]}}-%{{customdata[1]}} min<br>"
+                f"{t('xG local')} ({home_team}): "
+                "%{customdata[2]:.2f}<br>"
+                f"{t('xG visitante')} ({away_team}): "
+                "%{customdata[3]:.2f}<br>"
+                f"{t('Diferencia del intervalo')}: %{{customdata[4]:.2f}}<br>"
+                f"{t('Diferencial acumulado')}: %{{y:.2f}}<extra></extra>"
             ),
-            name="Visitante - local",
+            name=t("Visitante - local"),
         )
     )
     figure.add_hline(y=0, line_dash="dash", line_color="#6C7683")
@@ -219,9 +225,9 @@ def xg_difference_line(
         shots or [],
     )
     figure.update_layout(
-        title="Diferencial acumulado de xG",
-        xaxis_title="Minuto",
-        yaxis_title=f"xG acumulado: {away_team} - {home_team}",
+        title=t("Diferencial acumulado de xG"),
+        xaxis_title=t("Minuto"),
+        yaxis_title=f"{t('xG acumulado')}: {away_team} - {home_team}",
         hovermode="x unified",
         template="plotly_white",
         margin={"l": 45, "r": 70, "t": 60, "b": 60},
@@ -257,21 +263,21 @@ def momentum_line(
             "attacking_events": True,
         },
         labels={
-            "interval_start": "Minuto",
+            "interval_start": t("Minuto"),
             "momentum_score": "Momentum",
-            "team_name": "Equipo",
-            "interval_label": "Intervalo",
-            "shots": "Tiros",
+            "team_name": t("Equipo"),
+            "interval_label": t("Intervalo"),
+            "shots": t("Tiros"),
             "xg": "xG",
-            "final_third_entries": "Entradas al tercio final",
-            "attacking_events": "Eventos ofensivos",
+            "final_third_entries": t("Entradas al tercio final"),
+            "attacking_events": t("Eventos ofensivos"),
         },
     )
     figure.update_layout(
-        title="Momentum por intervalos",
+        title=t("Momentum por intervalos"),
         hovermode="x unified",
         template="plotly_white",
-        yaxis_title="Momentum score",
+        yaxis_title=t("Momentum score"),
         legend={
             "orientation": "h",
             "yanchor": "top",
@@ -286,7 +292,7 @@ def momentum_line(
 
 def _empty_figure(title: str) -> go.Figure:
     figure = go.Figure()
-    figure.update_layout(title=title, xaxis={"visible": False}, yaxis={"visible": False})
+    figure.update_layout(title=t(title), xaxis={"visible": False}, yaxis={"visible": False})
     return figure
 
 
@@ -300,9 +306,9 @@ def _team_color(team_name: Any, home_team: str | None, away_team: str | None, li
 
 def _team_label(team_name: Any, home_team: str | None, away_team: str | None) -> str:
     if team_name == home_team:
-        return f"Local ({team_name})"
+        return f"{t('Local')} ({team_name})"
     if team_name == away_team:
-        return f"Visitante ({team_name})"
+        return f"{t('Visitante')} ({team_name})"
     return str(team_name)
 
 
@@ -328,8 +334,8 @@ def _add_goal_markers(
 ) -> None:
     goals = _goal_events(shots, home_team, away_team)
     for role, y_value, color, name, textposition in (
-        ("away", goal_offset, AWAY_COLOR, f"Goles visitante ({away_team})", "top center"),
-        ("home", -goal_offset, HOME_COLOR, f"Goles local ({home_team})", "bottom center"),
+        ("away", goal_offset, AWAY_COLOR, f"{t('Goles')} {t('visitante')} ({away_team})", "top center"),
+        ("home", -goal_offset, HOME_COLOR, f"{t('Goles')} {t('local')} ({home_team})", "bottom center"),
     ):
         role_goals = [goal for goal in goals if goal["role"] == role]
         if not role_goals:
@@ -348,10 +354,10 @@ def _add_goal_markers(
                 },
                 customdata=[[goal["player_name"], goal["team_name"], goal["minute_label"]] for goal in role_goals],
                 hovertemplate=(
-                    "<b>Gol</b><br>"
-                    "Jugador: %{customdata[0]}<br>"
-                    "Equipo: %{customdata[1]}<br>"
-                    "Minuto: %{customdata[2]}<extra></extra>"
+                    f"<b>{t('Gol')}</b><br>"
+                    f"{t('Jugador')}: %{{customdata[0]}}<br>"
+                    f"{t('Equipo')}: %{{customdata[1]}}<br>"
+                    f"{t('Minuto')}: %{{customdata[2]}}<extra></extra>"
                 ),
                 textposition=textposition,
             )
@@ -372,8 +378,8 @@ def _add_final_score_markers(
     resolved_home_score = home_score if home_score is not None else sum(1 for goal in goals if goal["role"] == "home")
     resolved_away_score = away_score if away_score is not None else sum(1 for goal in goals if goal["role"] == "away")
     for y_value, color, text, hover_team in (
-        (goal_offset, AWAY_COLOR, f"Visitante {resolved_away_score}", away_team),
-        (-goal_offset, HOME_COLOR, f"Local {resolved_home_score}", home_team),
+        (goal_offset, AWAY_COLOR, f"{t('Visitante')} {resolved_away_score}", away_team),
+        (-goal_offset, HOME_COLOR, f"{t('Local')} {resolved_home_score}", home_team),
     ):
         figure.add_trace(
             go.Scatter(

@@ -14,9 +14,9 @@ from src.analytics.db import AnalyticsDatabaseError, query_df
 from src.security.streamlit_auth import require_login
 from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_score
-from src.ui.page_config import soccer_page_icon
+from src.ui.navigation import ensure_page_shell
 
-st.set_page_config(page_title="Partidos", page_icon=soccer_page_icon(), layout="wide")
+ensure_page_shell("Partidos")
 require_login()
 st.title("Partidos")
 

@@ -29,10 +29,11 @@ from src.security.streamlit_auth import require_login
 from src.ui.downloads import render_download_button
 from src.ui.footer import render_footer
 from src.ui.formatters import format_score
-from src.ui.page_config import soccer_page_icon
+from src.ui.i18n import current_language
+from src.ui.navigation import ensure_page_shell
 from src.ui.pitch_charts import plot_pass_network
 
-st.set_page_config(page_title="Gráficas avanzadas", page_icon=soccer_page_icon(), layout="wide")
+ensure_page_shell("Gráficas avanzadas")
 require_login()
 st.title("Gráficas avanzadas")
 
@@ -83,10 +84,19 @@ def render_pdf_button(
     figures: list[object] | None = None,
     key: str | None = None,
 ) -> None:
-    button_key = key or f"advanced_pdf_{tab_name}_{match_id}_{selected_team}_{selected_player_label}"
+    selected_language = current_language()
+    base_button_key = key or f"advanced_pdf_{tab_name}_{match_id}_{selected_team}_{selected_player_label}"
+    button_key = f"{base_button_key}_{selected_language}"
     result_key = f"{button_key}_result"
     if st.button("Exportar PDF de esta pestaña", key=button_key):
-        st.session_state[result_key] = save_analysis_tab_pdf(tab_name, match_id, title, sections, figures or [])
+        st.session_state[result_key] = save_analysis_tab_pdf(
+            tab_name,
+            match_id,
+            title,
+            sections,
+            figures or [],
+            language=selected_language,
+        )
 
     result = st.session_state.get(result_key)
     if not result:
@@ -255,7 +265,10 @@ with chart_tabs[3]:
     if team_filter is None:
         st.info("Selecciona un equipo específico para construir la red de pases.")
         pass_network_sections.append(
-            {"heading": "Red de pases", "paragraphs": ["Selecciona un equipo específico para construir la red de pases."]}
+            {
+                "heading": "Red de pases",
+                "paragraphs": ["Selecciona un equipo específico para construir la red de pases."],
+            }
         )
     elif bundle.get("pass_network"):
         pass_network_fig = plot_pass_network(bundle["pass_network"])
@@ -275,7 +288,9 @@ with chart_tabs[3]:
         )
     else:
         st.info("No hay datos suficientes para red de pases.")
-        pass_network_sections.append({"heading": "Red de pases", "paragraphs": ["No hay datos suficientes para red de pases."]})
+        pass_network_sections.append(
+            {"heading": "Red de pases", "paragraphs": ["No hay datos suficientes para red de pases."]}
+        )
     render_pdf_button(
         "graficas_avanzadas_red_pases",
         f"Red de pases | {match_score_label}",

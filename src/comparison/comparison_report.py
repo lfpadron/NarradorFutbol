@@ -9,6 +9,7 @@ from typing import Any
 
 from src.config import COMPARISONS_DIR, project_relative
 from src.ingestion.utils import to_jsonable
+from src.ui.i18n import is_english, translate_text
 
 
 def render_match_comparison_markdown(
@@ -20,50 +21,63 @@ def render_match_comparison_markdown(
     summary = comparison.get("summary_comparison", {})
     dominance = comparison.get("dominance_comparison", {})
     impact = comparison.get("impact_players_comparison", {})
+    language = (narrative or {}).get("language")
+    english = is_english(language)
     lines = [
-        "# Comparación de partidos",
+        "# Match Comparison" if english else "# Comparación de partidos",
         "",
-        "## Partidos",
+        "## Matches" if english else "## Partidos",
         "",
-        f"- **Partido A:** `{match_a.get('match_id')}` | {match_a.get('scoreline')}",
-        f"- **Partido B:** `{match_b.get('match_id')}` | {match_b.get('scoreline')}",
+        f"- **{'Match A' if english else 'Partido A'}:** `{match_a.get('match_id')}` | {match_a.get('scoreline')}",
+        f"- **{'Match B' if english else 'Partido B'}:** `{match_b.get('match_id')}` | {match_b.get('scoreline')}",
         "",
-        "## Resumen de diferencias",
+        "## Difference Summary" if english else "## Resumen de diferencias",
         "",
-        "| Métrica | Partido A | Partido B | Diferencia B-A | Mayor |",
+        (
+            "| Metric | Match A | Match B | B-A difference | Higher |"
+            if english
+            else "| Métrica | Partido A | Partido B | Diferencia B-A | Mayor |"
+        ),
         "| --- | ---: | ---: | ---: | --- |",
-        _metric_row("Goles", summary.get("goal_difference", {})),
-        _metric_row("Tiros", summary.get("shot_difference", {})),
-        _metric_row("xG", summary.get("xg_difference", {})),
-        _metric_row("Pases", summary.get("pass_difference", {})),
-        _metric_row("Ataques peligrosos", summary.get("dangerous_attack_difference", {})),
+        _metric_row("Goles", summary.get("goal_difference", {}), language),
+        _metric_row("Tiros", summary.get("shot_difference", {}), language),
+        _metric_row("xG", summary.get("xg_difference", {}), language),
+        _metric_row("Pases", summary.get("pass_difference", {}), language),
+        _metric_row("Ataques peligrosos", summary.get("dangerous_attack_difference", {}), language),
         "",
-        "## Intensidad",
+        "## Intensity" if english else "## Intensidad",
         "",
-        f"- **Partido A:** {summary.get('intensity_a', {}).get('score')} ({summary.get('intensity_a', {}).get('label')})",
-        f"- **Partido B:** {summary.get('intensity_b', {}).get('score')} ({summary.get('intensity_b', {}).get('label')})",
-        f"- **Mayor intensidad:** {summary.get('more_intense_match')}",
+        f"- **{'Match A' if english else 'Partido A'}:** {summary.get('intensity_a', {}).get('score')} ({translate_text(summary.get('intensity_a', {}).get('label'), language=language)})",
+        f"- **{'Match B' if english else 'Partido B'}:** {summary.get('intensity_b', {}).get('score')} ({translate_text(summary.get('intensity_b', {}).get('label'), language=language)})",
+        f"- **{'Higher intensity' if english else 'Mayor intensidad'}:** {summary.get('more_intense_match')}",
         "",
-        "## Dominio comparado",
+        "## Compared Dominance" if english else "## Dominio comparado",
         "",
-        f"- **Partido A:** {dominance.get('leader_a', {}).get('team_name')} | score {dominance.get('leader_a', {}).get('dominance_score')}",
-        f"- **Partido B:** {dominance.get('leader_b', {}).get('team_name')} | score {dominance.get('leader_b', {}).get('dominance_score')}",
+        f"- **{'Match A' if english else 'Partido A'}:** {dominance.get('leader_a', {}).get('team_name')} | score {dominance.get('leader_a', {}).get('dominance_score')}",
+        f"- **{'Match B' if english else 'Partido B'}:** {dominance.get('leader_b', {}).get('team_name')} | score {dominance.get('leader_b', {}).get('dominance_score')}",
         "",
-        "## Jugadores determinantes",
+        "## Decisive Players" if english else "## Jugadores determinantes",
         "",
-        f"- **Partido A:** {impact.get('top_player_a', {}).get('player_name')} ({impact.get('top_player_a', {}).get('team_name')}) | impacto {impact.get('top_player_a', {}).get('impact_score')}",
-        f"- **Partido B:** {impact.get('top_player_b', {}).get('player_name')} ({impact.get('top_player_b', {}).get('team_name')}) | impacto {impact.get('top_player_b', {}).get('impact_score')}",
+        f"- **{'Match A' if english else 'Partido A'}:** {impact.get('top_player_a', {}).get('player_name')} ({impact.get('top_player_a', {}).get('team_name')}) | {'impact' if english else 'impacto'} {impact.get('top_player_a', {}).get('impact_score')}",
+        f"- **{'Match B' if english else 'Partido B'}:** {impact.get('top_player_b', {}).get('player_name')} ({impact.get('top_player_b', {}).get('team_name')}) | {'impact' if english else 'impacto'} {impact.get('top_player_b', {}).get('impact_score')}",
         "",
     ]
 
     warnings = comparison.get("warnings", [])
     if warnings:
-        lines.extend(["## Advertencias", ""])
+        lines.extend(["## Warnings" if english else "## Advertencias", ""])
         lines.extend(f"- {warning}" for warning in warnings)
         lines.append("")
 
     if narrative:
-        lines.extend(["## Narrativa comparativa", "", str(narrative.get("narrative_markdown") or ""), ""])
+        lines.extend(
+            [
+                "## Comparative Narrative" if english else "## Narrativa comparativa",
+                "",
+                str(narrative.get("narrative_markdown") or ""),
+                "",
+            ]
+        )
 
     return "\n".join(lines)
 
@@ -94,9 +108,9 @@ def save_match_comparison(
     }
 
 
-def _metric_row(label: str, values: dict[str, Any]) -> str:
+def _metric_row(label: str, values: dict[str, Any], language: object | None = None) -> str:
     return (
-        f"| {label} | {values.get('match_a')} | {values.get('match_b')} | "
+        f"| {translate_text(label, language=language)} | {values.get('match_a')} | {values.get('match_b')} | "
         f"{values.get('difference_b_minus_a')} | {values.get('higher_match')} |"
     )
 

@@ -3,76 +3,26 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import duckdb
 import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import ANALYTICS_DB
-from src.security.streamlit_auth import require_login
-from src.ui.footer import render_footer
+from src.ui.i18n import current_language, install_streamlit_i18n, render_language_selector, t
+from src.ui.navigation import NAVIGATION_SHELL_SESSION_KEY, build_streamlit_pages, render_sidebar_navigation
 from src.ui.page_config import soccer_page_icon
 
-st.set_page_config(page_title="Narrador Inteligente de Futbol", page_icon=soccer_page_icon(), layout="wide")
-require_login()
-
-
-@st.cache_data(show_spinner=False)
-def get_database_status() -> dict[str, object]:
-    if not ANALYTICS_DB.exists():
-        return {"exists": False}
-
-    try:
-        with duckdb.connect(str(ANALYTICS_DB), read_only=True) as connection:
-            return {
-                "exists": True,
-                "path": ANALYTICS_DB.as_posix(),
-                "matches": connection.execute(
-                    "SELECT COUNT(*) FROM vw_match_summary WHERE total_events > 0"
-                ).fetchone()[0],
-                "events": connection.execute("SELECT COUNT(*) FROM event").fetchone()[0],
-                "shots": connection.execute("SELECT COUNT(*) FROM shot").fetchone()[0],
-                "passes": connection.execute('SELECT COUNT(*) FROM "pass"').fetchone()[0],
-            }
-    except duckdb.Error as exc:
-        return {"exists": True, "error": str(exc), "path": ANALYTICS_DB.as_posix()}
-
-
-st.title("Narrador Inteligente de Futbol")
-st.write(
-    "Explorador local para revisar la ingesta, los partidos transformados y las "
-    "metricas futbolisticas generadas desde StatsBomb Open Data."
+language = current_language()
+st.set_page_config(
+    page_title=str(t("Narrador Inteligente de Futbol", language=language)),
+    page_icon=soccer_page_icon(),
+    layout="wide",
 )
-
-status = get_database_status()
-
-st.subheader("Estado de DuckDB")
-if not status.get("exists"):
-    st.warning("No existe `data/analytics/statsbomb.duckdb`.")
-    st.code("uv run python -m src.transform.build_duckdb --limit 3 --force", language="bash")
-elif status.get("error"):
-    st.error("La base existe, pero no se pudo leer.")
-    st.code(str(status["error"]))
-else:
-    st.caption(str(status.get("path")))
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Partidos transformados", status.get("matches", 0))
-    col2.metric("Eventos", status.get("events", 0))
-    col3.metric("Tiros", status.get("shots", 0))
-    col4.metric("Pases", status.get("passes", 0))
-
-st.subheader("Flujo recomendado")
-st.code(
-    "\n".join(
-        [
-            "uv run python -m src.ingestion.run_ingestion --limit 3",
-            "uv run python -m src.transform.build_duckdb --limit 3 --force",
-            "uv run python -m src.analytics.run_analysis --list-matches",
-            "uv run streamlit run app/streamlit_app.py",
-        ]
-    ),
-    language="bash",
-)
-render_footer()
+pages = build_streamlit_pages(language)
+page = st.navigation(pages, position="hidden")
+st.session_state[NAVIGATION_SHELL_SESSION_KEY] = True
+render_language_selector()
+render_sidebar_navigation(language, pages)
+install_streamlit_i18n()
+page.run()

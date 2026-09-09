@@ -16,9 +16,10 @@ def build_match_report(
     match_id: int,
     tone: str = "cronica_emocionante",
     use_api: bool = False,
+    language: str = "es",
 ) -> dict[str, Any]:
     context = build_ai_match_context(match_id)
-    narrative = generate_match_narrative(match_id, tone=tone, use_api=use_api)
+    narrative = generate_match_narrative(match_id, tone=tone, use_api=use_api, language=language)
     quality = evaluate_narrative_quality(narrative["narrative_markdown"], context)
     validation = context.get("validation", {})
     validation_warnings = [
@@ -29,6 +30,7 @@ def build_match_report(
     return to_jsonable(
         {
             "match_id": match_id,
+            "language": language,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "tone": tone,
             "match_summary": context.get("match_summary", {}),

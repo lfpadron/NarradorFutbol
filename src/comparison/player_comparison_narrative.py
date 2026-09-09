@@ -11,6 +11,7 @@ from openai import OpenAI, OpenAIError
 from src.comparison.player_comparison import compare_players
 from src.ingestion.utils import to_jsonable
 from src.narrative.config import get_openai_api_key, get_openai_model
+from src.ui.i18n import is_english
 
 
 def generate_player_comparison_narrative(
@@ -19,6 +20,7 @@ def generate_player_comparison_narrative(
     match_id_b: int,
     player_id_b: int,
     use_api: bool = False,
+    language: str = "es",
 ) -> dict[str, Any]:
     comparison = compare_players(match_id_a, player_id_a, match_id_b, player_id_b)
     model = get_openai_model()
@@ -31,23 +33,45 @@ def generate_player_comparison_narrative(
             client = OpenAI(api_key=api_key)
             response = client.responses.create(
                 model=model,
-                input=_build_prompt(comparison),
+                input=_build_prompt(comparison, language=language),
                 temperature=0.3,
             )
             narrative_markdown = _extract_response_text(response).strip()
             status = "generated"
         except OpenAIError as exc:
-            narrative_markdown = _fallback_narrative(comparison)
-            warnings.append(f"OpenAI API falló; se usó narrativa comparativa local. Detalle: {exc}")
+            narrative_markdown = _fallback_narrative(comparison, language=language)
+            warnings.append(
+                _warning(
+                    "OpenAI API falló; se usó narrativa comparativa local.",
+                    "OpenAI API failed; local comparative narrative used.",
+                    language,
+                    exc,
+                )
+            )
         except Exception as exc:
-            narrative_markdown = _fallback_narrative(comparison)
-            warnings.append(f"No se pudo generar con API; se usó narrativa comparativa local. Detalle: {exc}")
+            narrative_markdown = _fallback_narrative(comparison, language=language)
+            warnings.append(
+                _warning(
+                    "No se pudo generar con API; se usó narrativa comparativa local.",
+                    "Could not generate with API; local comparative narrative used.",
+                    language,
+                    exc,
+                )
+            )
     else:
-        narrative_markdown = _fallback_narrative(comparison)
+        narrative_markdown = _fallback_narrative(comparison, language=language)
         if use_api and not api_key:
-            warnings.append("OPENAI_API_KEY no está configurada; se usó narrativa comparativa local.")
+            warnings.append(
+                "OPENAI_API_KEY is not configured; local comparative narrative used."
+                if is_english(language)
+                else "OPENAI_API_KEY no está configurada; se usó narrativa comparativa local."
+            )
         elif not use_api:
-            warnings.append("Uso de OpenAI API desactivado; se usó narrativa comparativa local.")
+            warnings.append(
+                "OpenAI API use is disabled; local comparative narrative used."
+                if is_english(language)
+                else "Uso de OpenAI API desactivado; se usó narrativa comparativa local."
+            )
 
     return to_jsonable(
         {
@@ -58,6 +82,7 @@ def generate_player_comparison_narrative(
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "status": status,
             "model": model,
+            "language": language,
             "narrative_markdown": narrative_markdown,
             "warnings": warnings,
             "comparison_summary": comparison.get("summary_comparison", {}),
@@ -65,7 +90,7 @@ def generate_player_comparison_narrative(
     )
 
 
-def _build_prompt(comparison: dict[str, Any]) -> str:
+def _build_prompt(comparison: dict[str, Any], language: str = "es") -> str:
     compact = {
         "player_a": comparison.get("player_a"),
         "player_b": comparison.get("player_b"),
@@ -79,6 +104,38 @@ def _build_prompt(comparison: dict[str, Any]) -> str:
         "key_moments_comparison": comparison.get("key_moments_comparison"),
         "warnings": comparison.get("warnings"),
     }
+    if is_english(language):
+        return f"""You are a football analyst preparing a player comparison for scouting.
+
+Rules:
+- Do not invent goals, assists, teams, or match context.
+- Do not say one player was better unless the data supports it.
+- If the roles differ, state that the comparison should be read carefully.
+- Distinguish volume, efficiency, and impact.
+- Use professional English.
+- Use Markdown with these exact sections:
+
+# Player Comparison
+
+## Executive Summary
+
+## Player A
+
+## Player B
+
+## Attacking Comparison
+
+## Creation Comparison
+
+## Defensive Comparison
+
+## Match Impact
+
+## Conclusion
+
+Data:
+{json.dumps(compact, ensure_ascii=False, indent=2)}
+"""
     return f"""Eres un analista de fútbol preparando una comparación de jugadores para scouting.
 
 Reglas:
@@ -112,7 +169,7 @@ Datos:
 """
 
 
-def _fallback_narrative(comparison: dict[str, Any]) -> str:
+def _fallback_narrative(comparison: dict[str, Any], language: str = "es") -> str:
     player_a = comparison.get("player_a", {})
     player_b = comparison.get("player_b", {})
     match_a = comparison.get("match_a", {})
@@ -125,6 +182,52 @@ def _fallback_narrative(comparison: dict[str, Any]) -> str:
 
     role_warning = summary.get("role_warning")
     role_text = f" {role_warning}" if role_warning else ""
+
+    if is_english(language):
+        return f"""# Player Comparison
+
+## Executive Summary
+
+Player A: **{player_a.get('player_name', 'N/A')}** ({player_a.get('team_name', 'N/A')}) in {match_a.get('scoreline', 'N/A')}. Player B: **{player_b.get('player_name', 'N/A')}** ({player_b.get('team_name', 'N/A')}) in {match_b.get('scoreline', 'N/A')}.{role_text}
+
+## Player A
+
+Recorded {player_a.get('events', 'N/A')} events, {player_a.get('shots', 'N/A')} shots, {player_a.get('goals', 'N/A')} goals, {player_a.get('xg', 'N/A')} xG, {player_a.get('assists', 'N/A')} assists, and {player_a.get('key_passes', 'N/A')} key passes. Available impact_score: {player_a.get('impact_score', 'N/A')}.
+
+## Player B
+
+Recorded {player_b.get('events', 'N/A')} events, {player_b.get('shots', 'N/A')} shots, {player_b.get('goals', 'N/A')} goals, {player_b.get('xg', 'N/A')} xG, {player_b.get('assists', 'N/A')} assists, and {player_b.get('key_passes', 'N/A')} key passes. Available impact_score: {player_b.get('impact_score', 'N/A')}.
+
+## Attacking Comparison
+
+- Shots: A {attacking.get('shots', {}).get('player_a', 'N/A')} vs B {attacking.get('shots', {}).get('player_b', 'N/A')}.
+- Goals: A {attacking.get('goals', {}).get('player_a', 'N/A')} vs B {attacking.get('goals', {}).get('player_b', 'N/A')}.
+- xG: A {attacking.get('xg', {}).get('player_a', 'N/A')} vs B {attacking.get('xg', {}).get('player_b', 'N/A')}.
+- Carries: A {attacking.get('carries', {}).get('player_a', 'N/A')} vs B {attacking.get('carries', {}).get('player_b', 'N/A')}.
+
+## Creation Comparison
+
+- Passes: A {passing.get('passes', {}).get('player_a', 'N/A')} vs B {passing.get('passes', {}).get('player_b', 'N/A')}.
+- Pass accuracy: A {passing.get('pass_accuracy_pct', {}).get('player_a', 'N/A')}% vs B {passing.get('pass_accuracy_pct', {}).get('player_b', 'N/A')}%.
+- Assists: A {passing.get('assists', {}).get('player_a', 'N/A')} vs B {passing.get('assists', {}).get('player_b', 'N/A')}.
+- Key passes: A {passing.get('key_passes', {}).get('player_a', 'N/A')} vs B {passing.get('key_passes', {}).get('player_b', 'N/A')}.
+- Progressive passes: A {passing.get('progressive_passes', {}).get('player_a', 'N/A')} vs B {passing.get('progressive_passes', {}).get('player_b', 'N/A')}.
+
+## Defensive Comparison
+
+- Pressures: A {defensive.get('pressures', {}).get('player_a', 'N/A')} vs B {defensive.get('pressures', {}).get('player_b', 'N/A')}.
+- Duels: A {defensive.get('duels', {}).get('player_a', 'N/A')} vs B {defensive.get('duels', {}).get('player_b', 'N/A')}.
+- Fouls committed: A {defensive.get('fouls_committed', {}).get('player_a', 'N/A')} vs B {defensive.get('fouls_committed', {}).get('player_b', 'N/A')}.
+- Fouls won: A {defensive.get('fouls_won', {}).get('player_a', 'N/A')} vs B {defensive.get('fouls_won', {}).get('player_b', 'N/A')}.
+
+## Match Impact
+
+Impact should separate volume from direct influence. Player A had impact_score {impact.get('impact_score', {}).get('player_a', 'N/A')} and {impact.get('key_moments_count', {}).get('player_a', 'N/A')} key moments. Player B had impact_score {impact.get('impact_score', {}).get('player_b', 'N/A')} and {impact.get('key_moments_count', {}).get('player_b', 'N/A')} key moments.
+
+## Conclusion
+
+This is a statistical and contextual comparison. It helps observe profiles, not declare absolute superiority: role, match state, and team context shape the reading.
+"""
 
     return f"""# Comparación de jugadores
 
@@ -170,6 +273,12 @@ El impacto debe leerse separando volumen e incidencia directa. Jugador A tuvo im
 
 Esta comparación es estadística y contextual. Sirve para observar perfiles, no para declarar superioridad absoluta: el rol, el partido y el equipo condicionan la lectura.
 """
+
+
+def _warning(spanish: str, english: str, language: str, exc: Exception) -> str:
+    message = english if is_english(language) else spanish
+    detail_label = "Detail" if is_english(language) else "Detalle"
+    return f"{message} {detail_label}: {exc}"
 
 
 def _extract_response_text(response: Any) -> str:

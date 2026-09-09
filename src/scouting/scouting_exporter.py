@@ -17,6 +17,7 @@ from src.ingestion.utils import to_jsonable
 from src.reports.branding import add_docx_footer
 from src.reports.pdf_report import render_pdf_report
 from src.scouting.scouting_history import build_scouting_history_record, record_scouting_generation
+from src.ui.i18n import is_english, translate_text
 
 
 def save_scouting_export(
@@ -116,23 +117,28 @@ def render_scouting_markdown(result: dict[str, Any]) -> str:
     warnings = result.get("warnings", [])
     language_warnings = result.get("language_warnings", [])
     narrative = _strip_top_heading(str(result.get("narrative_markdown") or ""))
+    english = is_english(result.get("language"))
+    na = "N/A" if english else "N/D"
+    mode_value = str(result.get("mode", "individual"))
+    if english and mode_value == "comparativo":
+        mode_value = "comparative"
 
     lines = [
-        "# Reporte profesional de scouting",
+        "# Professional Scouting Report" if english else "# Reporte profesional de scouting",
         "",
-        "## Datos generales",
+        "## General Information" if english else "## Datos generales",
         "",
-        f"- **Modo:** {result.get('mode', 'individual')}",
-        f"- **Jugador A:** {summary.get('player_a', 'N/D')} ({summary.get('team_a', 'N/D')})",
-        f"- **Partido A:** {summary.get('match_a', 'N/D')}",
+        f"- **{'Mode' if english else 'Modo'}:** {mode_value}",
+        f"- **{'Player A' if english else 'Jugador A'}:** {summary.get('player_a', na)} ({summary.get('team_a', na)})",
+        f"- **{'Match A' if english else 'Partido A'}:** {summary.get('match_a', na)}",
         f"- **Match ID A:** {result.get('match_id_a')}",
         f"- **Player ID A:** {result.get('player_id_a')}",
     ]
     if result.get("mode") == "comparativo":
         lines.extend(
             [
-                f"- **Jugador B:** {summary.get('player_b', 'N/D')} ({summary.get('team_b', 'N/D')})",
-                f"- **Partido B:** {summary.get('match_b', 'N/D')}",
+                f"- **{'Player B' if english else 'Jugador B'}:** {summary.get('player_b', na)} ({summary.get('team_b', na)})",
+                f"- **{'Match B' if english else 'Partido B'}:** {summary.get('match_b', na)}",
                 f"- **Match ID B:** {result.get('match_id_b')}",
                 f"- **Player ID B:** {result.get('player_id_b')}",
             ]
@@ -140,34 +146,54 @@ def render_scouting_markdown(result: dict[str, Any]) -> str:
 
     lines.extend(
         [
-            f"- **Estado narrativo:** {result.get('status')}",
-            f"- **Modelo:** {result.get('model')}",
-            f"- **Generado en:** {result.get('generated_at')}",
+            f"- **{'Narrative status' if english else 'Estado narrativo'}:** {result.get('status')}",
+            f"- **{'Model' if english else 'Modelo'}:** {result.get('model')}",
+            f"- **{'Generated at' if english else 'Generado en'}:** {result.get('generated_at')}",
             "",
             narrative,
             "",
-            "## Advertencias de lenguaje/factualidad",
+            "## Language/Factuality Warnings" if english else "## Advertencias de lenguaje/factualidad",
             "",
         ]
     )
 
-    all_warnings = [f"Factualidad/contexto: {warning}" for warning in warnings]
-    all_warnings.extend(f"Lenguaje: {warning}" for warning in language_warnings)
+    all_warnings = [f"{'Factuality/context' if english else 'Factualidad/contexto'}: {warning}" for warning in warnings]
+    all_warnings.extend(f"{'Language' if english else 'Lenguaje'}: {warning}" for warning in language_warnings)
     if all_warnings:
         lines.extend(f"- {warning}" for warning in all_warnings)
     else:
-        lines.append("- No se detectaron advertencias de lenguaje ni factualidad.")
+        lines.append(
+            "- No language or factuality warnings were detected."
+            if english
+            else "- No se detectaron advertencias de lenguaje ni factualidad."
+        )
 
     lines.extend(
         [
             "",
-            "## Trazabilidad",
+            "## Traceability" if english else "## Trazabilidad",
             "",
-            "- Fuente: StatsBomb Open Data.",
-            "- Contexto derivado del comparador de jugadores y métricas visuales del proyecto.",
-            "- El reporte evita inferencias no sustentadas sobre futuro, fichajes o valor de mercado.",
-            "- Los datos raw permanecen sin modificar en `data/raw/`.",
-            "- Historial persistente: `data/analytics/scouting_history.duckdb`.",
+            "- Source: StatsBomb Open Data." if english else "- Fuente: StatsBomb Open Data.",
+            (
+                "- Context derived from the player comparator and the project's visual metrics."
+                if english
+                else "- Contexto derivado del comparador de jugadores y métricas visuales del proyecto."
+            ),
+            (
+                "- The report avoids unsupported inferences about future performance, transfers, or market value."
+                if english
+                else "- El reporte evita inferencias no sustentadas sobre futuro, fichajes o valor de mercado."
+            ),
+            (
+                "- Raw data remains unchanged in `data/raw/`."
+                if english
+                else "- Los datos raw permanecen sin modificar en `data/raw/`."
+            ),
+            (
+                "- Persistent history: `data/analytics/scouting_history.duckdb`."
+                if english
+                else "- Historial persistente: `data/analytics/scouting_history.duckdb`."
+            ),
             "",
         ]
     )
@@ -178,8 +204,9 @@ def render_scouting_html(result: dict[str, Any], markdown_text: str | None = Non
     markdown_text = markdown_text if markdown_text is not None else render_scouting_markdown(result)
     body = markdown.markdown(markdown_text, extensions=["tables", "sane_lists"])
     title = html.escape(_html_title(result))
+    lang = "en" if is_english(result.get("language")) else "es"
     return f"""<!doctype html>
-<html lang="es">
+<html lang="{lang}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -366,8 +393,8 @@ def _html_title(result: dict[str, Any]) -> str:
     player_a = summary.get("player_a") or result.get("player_id_a")
     if result.get("mode") == "comparativo":
         player_b = summary.get("player_b") or result.get("player_id_b")
-        return f"Scouting {player_a} vs {player_b}"
-    return f"Scouting {player_a}"
+        return translate_text(f"Scouting {player_a} vs {player_b}", language=result.get("language"))
+    return translate_text(f"Scouting {player_a}", language=result.get("language"))
 
 
 def _public_path(path_value: str | Path) -> str:

@@ -10,6 +10,7 @@ from typing import Any
 
 from src.config import REPORTS_DIR, project_relative
 from src.reports.branding import draw_reportlab_footer
+from src.ui.i18n import current_language, is_english, translate_text
 
 
 def save_analysis_tab_pdf(
@@ -18,18 +19,27 @@ def save_analysis_tab_pdf(
     title: str,
     sections: list[dict[str, Any]],
     figures: list[Any] | None = None,
+    language: str | None = None,
 ) -> dict[str, Any]:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     exported_at = datetime.now()
     suffix = exported_at.strftime("%Y%m%d_%H%M%S")
     path = REPORTS_DIR / f"analysis_tab.match-{match_id}.{_safe_token(tab_name)}_{suffix}.pdf"
-    result = _render_pdf(path, title, sections, figures or [])
+    selected_language = current_language() if language is None else language
+    result = _render_pdf(path, title, sections, figures or [], selected_language)
+    result["language"] = selected_language
     result["exported_at"] = exported_at.isoformat(timespec="seconds")
     result["path"] = project_relative(Path(result["path"]))
     return result
 
 
-def _render_pdf(path: Path, title: str, sections: list[dict[str, Any]], figures: list[Any]) -> dict[str, Any]:
+def _render_pdf(
+    path: Path,
+    title: str,
+    sections: list[dict[str, Any]],
+    figures: list[Any],
+    language: str,
+) -> dict[str, Any]:
     image_warnings: list[str] = []
     try:
         from reportlab.lib import colors
@@ -59,9 +69,9 @@ def _render_pdf(path: Path, title: str, sections: list[dict[str, Any]], figures:
         body_style = ParagraphStyle("TabBody", parent=styles["BodyText"], fontSize=8.8, leading=11)
         small_style = ParagraphStyle("TabSmall", parent=styles["BodyText"], fontSize=7, leading=8)
 
-        story: list[Any] = [Paragraph(_escape(title), title_style)]
+        story: list[Any] = [Paragraph(_escape(str(translate_text(title, language=language))), title_style)]
         for figure in figures:
-            image, warning = _figure_image(figure)
+            image, warning = _figure_image(figure, language=language)
             if image is None:
                 if warning:
                     image_warnings.append(warning)
@@ -72,12 +82,12 @@ def _render_pdf(path: Path, title: str, sections: list[dict[str, Any]], figures:
         for section in sections:
             heading = section.get("heading")
             if heading:
-                story.append(Paragraph(_escape(str(heading)), heading_style))
+                story.append(Paragraph(_escape(str(translate_text(heading, language=language))), heading_style))
             for paragraph in section.get("paragraphs", []):
-                story.append(Paragraph(_escape(str(paragraph)), body_style))
+                story.append(Paragraph(_escape(str(translate_text(paragraph, language=language))), body_style))
             rows = section.get("rows") or []
             if rows:
-                table = _table(rows, Table, TableStyle, colors, small_style)
+                table = _table(rows, Table, TableStyle, colors, small_style, language)
                 if table is not None:
                     story.append(table)
                     story.append(Spacer(1, 8))
@@ -99,7 +109,7 @@ def _render_pdf(path: Path, title: str, sections: list[dict[str, Any]], figures:
         return {"status": "failed", "path": path.as_posix(), "error_message": str(exc), "warnings": image_warnings}
 
 
-def _figure_image(figure: Any) -> tuple[Any | None, str | None]:
+def _figure_image(figure: Any, language: str = "es") -> tuple[Any | None, str | None]:
     try:
         from reportlab.lib.units import inch
         from reportlab.platypus import Image
@@ -110,28 +120,44 @@ def _figure_image(figure: Any) -> tuple[Any | None, str | None]:
         image.drawHeight = 4.15 * inch
         return image, None
     except Exception as exc:
-        return None, _plotly_image_warning(exc)
+        return None, _plotly_image_warning(exc, language)
 
 
-def _plotly_image_warning(exc: Exception) -> str:
+def _plotly_image_warning(exc: Exception, language: str = "es") -> str:
     reason = " ".join(str(exc).split())
     lower_reason = reason.lower()
-    hint = "instala kaleido y Chrome/Chromium para imagenes Plotly"
-    if "chrome" in lower_reason or "chromium" in lower_reason:
-        hint = "instala Chrome/Chromium en el entorno donde corre Streamlit"
-    elif "kaleido" in lower_reason:
-        hint = "instala kaleido en el entorno donde corre Streamlit"
+    if is_english(language):
+        hint = "install kaleido and Chrome/Chromium for Plotly images"
+        if "chrome" in lower_reason or "chromium" in lower_reason:
+            hint = "install Chrome/Chromium in the environment running Streamlit"
+        elif "kaleido" in lower_reason:
+            hint = "install kaleido in the environment running Streamlit"
+    else:
+        hint = "instala kaleido y Chrome/Chromium para imágenes Plotly"
+        if "chrome" in lower_reason or "chromium" in lower_reason:
+            hint = "instala Chrome/Chromium en el entorno donde corre Streamlit"
+        elif "kaleido" in lower_reason:
+            hint = "instala kaleido en el entorno donde corre Streamlit"
     if len(reason) > 240:
         reason = f"{reason[:237]}..."
+    if is_english(language):
+        return f"Could not embed a Plotly chart; {hint}. Detail: {reason}"
     return f"No se pudo incrustar una grafica Plotly; {hint}. Detalle: {reason}"
 
 
-def _table(rows: list[dict[str, Any]], table_class: Any, style_class: Any, colors: Any, cell_style: Any) -> Any | None:
+def _table(
+    rows: list[dict[str, Any]],
+    table_class: Any,
+    style_class: Any,
+    colors: Any,
+    cell_style: Any,
+    language: str,
+) -> Any | None:
     visible_rows = rows[:28]
     if not visible_rows:
         return None
     headers = list(visible_rows[0].keys())[:8]
-    data = [[_cell(header, cell_style) for header in headers]]
+    data = [[_cell(translate_text(header, language=language), cell_style) for header in headers]]
     for row in visible_rows:
         data.append([_cell(row.get(header), cell_style) for header in headers])
     table = table_class(data, repeatRows=1)

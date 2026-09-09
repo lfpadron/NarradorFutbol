@@ -22,12 +22,14 @@ from src.narrative_v2.style_evaluator import evaluate_style_fit
 from src.narrative_v2.style_profiles import STYLE_PROFILES, get_style_profile
 from src.reports.branding import add_docx_footer
 from src.reports.pdf_report import render_pdf_report
+from src.ui.i18n import is_english, style_display_name, translate_text
 
 
 def generate_specialized_narrative(
     match_id: int,
     style_id: str,
     use_api: bool = True,
+    language: str = "es",
 ) -> dict[str, Any]:
     profile = get_style_profile(style_id)
     full_context = build_ai_match_context(match_id)
@@ -39,7 +41,7 @@ def generate_specialized_narrative(
     api_key = get_openai_api_key()
     if use_api and api_key:
         try:
-            prompt = build_specialized_prompt(context_used, style_id)
+            prompt = build_specialized_prompt(context_used, style_id, language=language)
             client = OpenAI(api_key=api_key)
             response = client.responses.create(
                 model=model,
@@ -49,29 +51,49 @@ def generate_specialized_narrative(
             narrative_markdown = _extract_response_text(response).strip()
             status = "generated"
         except OpenAIError as exc:
-            narrative_markdown = generate_specialized_fallback(context_used, style_id)
-            warnings.append(f"OpenAI API fallo; se uso fallback local. Detalle: {exc}")
+            narrative_markdown = generate_specialized_fallback(context_used, style_id, language=language)
+            warnings.append(
+                _warning(
+                    "OpenAI API fallo; se uso fallback local.", "OpenAI API failed; local fallback used.", language, exc
+                )
+            )
         except Exception as exc:
-            narrative_markdown = generate_specialized_fallback(context_used, style_id)
-            warnings.append(f"No se pudo generar con API; se uso fallback local. Detalle: {exc}")
+            narrative_markdown = generate_specialized_fallback(context_used, style_id, language=language)
+            warnings.append(
+                _warning(
+                    "No se pudo generar con API; se uso fallback local.",
+                    "Could not generate with API; local fallback used.",
+                    language,
+                    exc,
+                )
+            )
     else:
-        narrative_markdown = generate_specialized_fallback(context_used, style_id)
+        narrative_markdown = generate_specialized_fallback(context_used, style_id, language=language)
         if use_api and not api_key:
-            warnings.append("OPENAI_API_KEY no esta configurada; se uso fallback local v2.")
+            warnings.append(
+                "OPENAI_API_KEY is not configured; local v2 fallback used."
+                if is_english(language)
+                else "OPENAI_API_KEY no esta configurada; se uso fallback local v2."
+            )
         elif not use_api:
-            warnings.append("Uso de OpenAI API desactivado; se uso fallback local v2.")
+            warnings.append(
+                "OpenAI API use is disabled; local v2 fallback used."
+                if is_english(language)
+                else "Uso de OpenAI API desactivado; se uso fallback local v2."
+            )
 
     fact_warnings = validate_narrative_against_context(
         _fact_guard_text(narrative_markdown),
         full_context,
     )
-    style_quality = evaluate_style_fit(narrative_markdown, style_id, full_context)
+    style_quality = evaluate_style_fit(narrative_markdown, style_id, full_context, language=language)
 
     return to_jsonable(
         {
             "match_id": match_id,
             "style_id": style_id,
-            "style_name": profile["name"],
+            "style_name": style_display_name(style_id, profile["name"], language=language),
+            "language": language,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "status": status,
             "model": model,
@@ -84,17 +106,17 @@ def generate_specialized_narrative(
     )
 
 
-def compare_specialized_styles(match_id: int, use_api: bool = False) -> dict[str, Any]:
+def compare_specialized_styles(match_id: int, use_api: bool = False, language: str = "es") -> dict[str, Any]:
     rows = []
     best_style = None
     best_score = -1
     for style_id, profile in STYLE_PROFILES.items():
-        result = generate_specialized_narrative(match_id, style_id, use_api=use_api)
+        result = generate_specialized_narrative(match_id, style_id, use_api=use_api, language=language)
         score = int(result.get("style_quality", {}).get("style_score") or 0)
         rows.append(
             {
                 "style_id": style_id,
-                "style_name": profile["name"],
+                "style_name": style_display_name(style_id, profile["name"], language=language),
                 "status": result.get("status"),
                 "style_score": score,
                 "fact_warnings_count": len(result.get("fact_warnings", [])),
@@ -104,7 +126,7 @@ def compare_specialized_styles(match_id: int, use_api: bool = False) -> dict[str
         if score > best_score:
             best_score = score
             best_style = style_id
-    return to_jsonable({"match_id": match_id, "styles": rows, "best_style": best_style})
+    return to_jsonable({"match_id": match_id, "language": language, "styles": rows, "best_style": best_style})
 
 
 def save_specialized_narrative(result: dict[str, Any]) -> tuple[str, str]:
@@ -177,42 +199,55 @@ def render_specialized_narrative_markdown(result: dict[str, Any]) -> str:
     profile = context.get("style_profile", {})
     summary = context.get("match_summary", {})
     quality = result.get("style_quality", {})
+    english = is_english(result.get("language"))
     lines = [
         "# Narrador AI v2",
         "",
-        "## Datos generales",
+        "## General Data" if english else "## Datos generales",
         "",
-        f"- **Estilo:** {result.get('style_name') or profile.get('name') or result.get('style_id')}",
-        f"- **Audiencia:** {profile.get('audience', 'N/D')}",
-        f"- **Objetivo:** {profile.get('objective', 'N/D')}",
-        f"- **Partido:** {_score_line(summary)}",
+        f"- **{'Style' if english else 'Estilo'}:** {result.get('style_name') or profile.get('name') or result.get('style_id')}",
+        f"- **{'Audience' if english else 'Audiencia'}:** {translate_text(profile.get('audience', 'N/D'), language=result.get('language'))}",
+        f"- **{'Objective' if english else 'Objetivo'}:** {translate_text(profile.get('objective', 'N/D'), language=result.get('language'))}",
+        f"- **{'Match' if english else 'Partido'}:** {_score_line(summary)}",
         f"- **Match ID:** {result.get('match_id')}",
-        f"- **Estado:** {result.get('status')}",
-        f"- **Modelo:** {result.get('model')}",
-        f"- **Generado en:** {result.get('generated_at')}",
+        f"- **{'Status' if english else 'Estado'}:** {result.get('status')}",
+        f"- **{'Model' if english else 'Modelo'}:** {result.get('model')}",
+        f"- **{'Generated at' if english else 'Generado en'}:** {result.get('generated_at')}",
         "",
-        "## Narrativa",
+        "## Narrative" if english else "## Narrativa",
         "",
         _strip_top_heading(str(result.get("narrative_markdown") or "")),
         "",
-        "## Calidad de estilo",
+        "## Style Quality" if english else "## Calidad de estilo",
         "",
-        "| Metrica | Score |",
+        "| Metric | Score |" if english else "| Metrica | Score |",
         "| --- | ---: |",
-        f"| Estilo | {quality.get('style_score', 'N/D')} |",
-        f"| Estructura | {quality.get('structure_score', 'N/D')} |",
-        f"| Audiencia | {quality.get('audience_fit_score', 'N/D')} |",
-        f"| Factualidad | {quality.get('factuality_score', 'N/D')} |",
+        f"| {'Style' if english else 'Estilo'} | {quality.get('style_score', 'N/D')} |",
+        f"| {'Structure' if english else 'Estructura'} | {quality.get('structure_score', 'N/D')} |",
+        f"| {'Audience' if english else 'Audiencia'} | {quality.get('audience_fit_score', 'N/D')} |",
+        f"| {'Factuality' if english else 'Factualidad'} | {quality.get('factuality_score', 'N/D')} |",
         "",
-        "## Advertencias",
+        "## Warnings" if english else "## Advertencias",
         "",
         *_warning_lines(result),
         "",
-        "## Trazabilidad",
+        "## Traceability" if english else "## Trazabilidad",
         "",
-        "- Fuente: StatsBomb Open Data transformada a DuckDB analitico.",
-        "- Contexto reducido por perfil desde `src/narrative_v2/section_builder.py`.",
-        "- El archivo JSON conserva el contexto usado, calidad de estilo y advertencias.",
+        (
+            "- Source: StatsBomb Open Data transformed into analytical DuckDB."
+            if english
+            else "- Fuente: StatsBomb Open Data transformada a DuckDB analitico."
+        ),
+        (
+            "- Reduced context by profile from `src/narrative_v2/section_builder.py`."
+            if english
+            else "- Contexto reducido por perfil desde `src/narrative_v2/section_builder.py`."
+        ),
+        (
+            "- The JSON file keeps the used context, style quality, and warnings."
+            if english
+            else "- El archivo JSON conserva el contexto usado, calidad de estilo y advertencias."
+        ),
         "",
     ]
     return "\n".join(lines)
@@ -222,8 +257,9 @@ def render_specialized_narrative_html(result: dict[str, Any], markdown_text: str
     markdown_text = markdown_text if markdown_text is not None else render_specialized_narrative_markdown(result)
     body = markdown.markdown(markdown_text, extensions=["tables", "sane_lists"])
     title = _html_escape(_html_title(result))
+    lang = "en" if is_english(result.get("language")) else "es"
     return f"""<!doctype html>
-<html lang="es">
+<html lang="{lang}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -348,12 +384,17 @@ def _build_specialized_export_paths(match_id: int, style_id: str) -> tuple[datet
 
 
 def _warning_lines(result: dict[str, Any]) -> list[str]:
+    english = is_english(result.get("language"))
     warnings = []
-    warnings.extend(f"- Generacion: {warning}" for warning in result.get("warnings", []))
-    warnings.extend(f"- Factualidad: {warning}" for warning in result.get("fact_warnings", []))
+    warnings.extend(
+        f"- {'Generation' if english else 'Generacion'}: {warning}" for warning in result.get("warnings", [])
+    )
+    warnings.extend(
+        f"- {'Factuality' if english else 'Factualidad'}: {warning}" for warning in result.get("fact_warnings", [])
+    )
     style_quality = result.get("style_quality", {})
-    warnings.extend(f"- Estilo: {warning}" for warning in style_quality.get("warnings", []))
-    return warnings or ["- No se detectaron advertencias."]
+    warnings.extend(f"- {'Style' if english else 'Estilo'}: {warning}" for warning in style_quality.get("warnings", []))
+    return warnings or ["- No warnings detected." if english else "- No se detectaron advertencias."]
 
 
 def _strip_top_heading(markdown_text: str) -> str:
@@ -424,8 +465,11 @@ def save_style_comparison(comparison: dict[str, Any]) -> str:
     return project_relative(path)
 
 
-def generate_specialized_fallback(context: dict[str, Any], style_id: str) -> str:
+def generate_specialized_fallback(context: dict[str, Any], style_id: str, language: str = "es") -> str:
     summary = context.get("match_summary", {})
+    if is_english(language):
+        return _fallback_specialized_en(context, summary, style_id)
+
     style_generators = {
         "tactico": _fallback_tactico,
         "television": _fallback_television,
@@ -434,6 +478,49 @@ def generate_specialized_fallback(context: dict[str, Any], style_id: str) -> str
         "ejecutivo": _fallback_ejecutivo,
     }
     return style_generators[style_id](context, summary)
+
+
+def _fallback_specialized_en(context: dict[str, Any], summary: dict[str, Any], style_id: str) -> str:
+    profile = get_style_profile(style_id)
+    sections = [str(translate_text(section, language="en")) for section in profile["expected_sections"]]
+    while len(sections) < 5:
+        sections.append("Final Read")
+    leader = _first(context.get("dominance", []))
+    xg = _xg_text(context.get("xg_breakdown", []), language="en")
+    dangerous = _dangerous_text(context.get("dangerous_attacks", []), language="en")
+    goal = _goal_moment(context.get("key_moments", []))
+    players = context.get("impact_players", [])[:5] or context.get("top_players", [])[:5]
+    player_rows = "\n".join(
+        f"- **{player.get('player_name')}** ({player.get('team_name')}): impact {player.get('impact_score', 'N/D')}, "
+        f"shots {player.get('shots', 'N/D')}, xG {player.get('xg', 'N/D')}."
+        for player in players
+    )
+    player_rows = player_rows or "- No impact players are available in the reduced context."
+
+    return f"""# {style_display_name(style_id, profile["name"], language="en")}
+
+## {sections[0]}
+
+{_score_line(summary)}. The result favored **{summary.get('winner_team_name', 'N/D')}**, while the volume read points toward **{leader.get('team_name', 'N/D')}** with an estimated dominance score of {leader.get('dominance_score', 'N/D')}.
+
+## {sections[1]}
+
+The match separates territorial control from efficiency. In xG: {xg}. This gap helps explain why the side with more production did not necessarily control the scoreline.
+
+## {sections[2]}
+
+{_moment_sentence(goal, language="en")} The key interpretation is to read momentum as a combination of shots, final-third entries, and attacking actions rather than as a scoreline substitute.
+
+## {sections[3]}
+
+{player_rows}
+
+## {sections[4]}
+
+{dangerous}
+
+The final read is contextual: this output describes observed match behavior, not future potential or external context.
+"""
 
 
 def _fallback_tactico(context: dict[str, Any], summary: dict[str, Any]) -> str:
@@ -608,24 +695,29 @@ def _score_line(summary: dict[str, Any]) -> str:
     )
 
 
-def _xg_text(rows: list[dict[str, Any]]) -> str:
+def _xg_text(rows: list[dict[str, Any]], language: str = "es") -> str:
     if not rows:
-        return "xG no disponible"
+        return "xG unavailable" if is_english(language) else "xG no disponible"
     return ", ".join(f"{row.get('team_name')} {row.get('xg_total')}" for row in rows)
 
 
-def _dangerous_text(rows: list[dict[str, Any]]) -> str:
+def _dangerous_text(rows: list[dict[str, Any]], language: str = "es") -> str:
     if not rows:
-        return "No hay ataques peligrosos suficientes en el contexto reducido."
+        return (
+            "There are not enough dangerous attacks in the reduced context."
+            if is_english(language)
+            else "No hay ataques peligrosos suficientes en el contexto reducido."
+        )
     counts: dict[str, int] = {}
     for row in rows:
-        team = str(row.get("team_name") or "Sin equipo")
+        team = str(row.get("team_name") or ("No team" if is_english(language) else "Sin equipo"))
         counts[team] = counts.get(team, 0) + 1
-    return (
-        "Ataques peligrosos en contexto reducido: "
-        + ", ".join(f"{team} {count}" for team, count in sorted(counts.items()))
-        + "."
+    prefix = (
+        "Dangerous attacks in the reduced context: "
+        if is_english(language)
+        else "Ataques peligrosos en contexto reducido: "
     )
+    return prefix + ", ".join(f"{team} {count}" for team, count in sorted(counts.items())) + "."
 
 
 def _goal_moment(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -635,13 +727,18 @@ def _goal_moment(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return _first(rows)
 
 
-def _moment_sentence(moment: dict[str, Any]) -> str:
+def _moment_sentence(moment: dict[str, Any], language: str = "es") -> str:
     if not moment:
-        return "El momento clave no esta disponible en el contexto reducido."
+        return (
+            "The key moment is not available in the reduced context."
+            if is_english(language)
+            else "El momento clave no esta disponible en el contexto reducido."
+        )
     minute = moment.get("minute")
     second = int(moment.get("second") or 0)
-    title = moment.get("title") or moment.get("type") or "Momento clave"
-    return f"Al {minute}:{second:02d}, {title}."
+    title = moment.get("title") or moment.get("type") or ("Key moment" if is_english(language) else "Momento clave")
+    prefix = "At" if is_english(language) else "Al"
+    return f"{prefix} {minute}:{second:02d}, {title}."
 
 
 def _player_or_default(moment: dict[str, Any], default: str) -> str:
@@ -660,3 +757,9 @@ def _fact_guard_text(markdown_text: str) -> str:
             continue
         lines.append(line)
     return "\n".join(lines)
+
+
+def _warning(spanish: str, english: str, language: str, exc: Exception) -> str:
+    message = english if is_english(language) else spanish
+    detail = "Detail" if is_english(language) else "Detalle"
+    return f"{message} {detail}: {exc}"

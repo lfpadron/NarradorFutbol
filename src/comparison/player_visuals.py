@@ -8,13 +8,15 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from src.ui.i18n import t
+
 HOME_COLOR = "#d62728"
 AWAY_COLOR = "#1f77b4"
 SECOND_SAME_TEAM_COLOR = "#2ca02c"
 
 
 def plot_player_radar(radar_metrics: dict[str, Any], player_colors: tuple[str, str] | None = None) -> go.Figure:
-    categories = list(radar_metrics.get("categories", []))
+    categories = [str(t(category)) for category in list(radar_metrics.get("categories", []))]
     player_a = radar_metrics.get("player_a", {})
     player_b = radar_metrics.get("player_b", {})
     if not categories:
@@ -33,7 +35,7 @@ def plot_player_radar(radar_metrics: dict[str, Any], player_colors: tuple[str, s
             r=values_a,
             theta=theta,
             fill="toself",
-            name=str(player_a.get("name") or "Jugador A"),
+            name=str(player_a.get("name") or t("Jugador A")),
             line={"color": color_a},
             fillcolor=_rgba(color_a, 0.18),
         )
@@ -44,16 +46,16 @@ def plot_player_radar(radar_metrics: dict[str, Any], player_colors: tuple[str, s
                 r=values_b,
                 theta=theta,
                 fill="toself",
-                name=str(player_b.get("name") or "Jugador B"),
+                name=str(player_b.get("name") or t("Jugador B")),
                 line={"color": color_b},
                 fillcolor=_rgba(color_b, 0.18),
             )
         )
     figure.update_layout(
-        title="Radar comparativo",
+        title=t("Radar comparativo"),
         polar={"radialaxis": {"visible": True, "range": [0, 100]}},
         template="plotly_white",
-        legend_title_text="Jugador",
+        legend_title_text=t("Jugador"),
         height=520,
         margin={"l": 40, "r": 40, "t": 70, "b": 95},
     )
@@ -75,8 +77,12 @@ def plot_player_metric_bars(comparison: dict[str, Any], player_colors: tuple[str
         ("pressures", "Presiones"),
         ("impact_score", "Impact score"),
     ):
-        rows.append({"Métrica": label, "Jugador": _player_label(player_a, "A"), "Valor": _number(player_a.get(metric))})
-        rows.append({"Métrica": label, "Jugador": _player_label(player_b, "B"), "Valor": _number(player_b.get(metric))})
+        rows.append(
+            {"Métrica": t(label), "Jugador": _player_label(player_a, "A"), "Valor": _number(player_a.get(metric))}
+        )
+        rows.append(
+            {"Métrica": t(label), "Jugador": _player_label(player_b, "B"), "Valor": _number(player_b.get(metric))}
+        )
     frame = pd.DataFrame(rows)
     if frame.empty:
         return _empty_figure("Métricas comparativas")
@@ -87,14 +93,14 @@ def plot_player_metric_bars(comparison: dict[str, Any], player_colors: tuple[str
         y="Valor",
         color="Jugador",
         barmode="group",
-        labels={"Valor": "Valor"},
+        labels={"Métrica": t("Métrica"), "Jugador": t("Jugador"), "Valor": t("Valor")},
         color_discrete_sequence=[color_a, color_b],
     )
     figure.update_layout(
-        title="Métricas comparativas",
+        title=t("Métricas comparativas"),
         template="plotly_white",
         height=430,
-        legend_title_text="Jugador",
+        legend_title_text=t("Jugador"),
         margin={"l": 40, "r": 25, "t": 65, "b": 95},
     )
     _legend_below(figure)
@@ -113,8 +119,12 @@ def plot_player_profile_groups(comparison: dict[str, Any], player_colors: tuple[
         "Impacto": ["impact_score", "key_moments_count", "events"],
     }
     for group, metrics in groups.items():
-        rows.append({"Grupo": group, "Jugador": _player_label(player_a, "A"), "Valor": _group_score(player_a, metrics)})
-        rows.append({"Grupo": group, "Jugador": _player_label(player_b, "B"), "Valor": _group_score(player_b, metrics)})
+        rows.append(
+            {"Grupo": t(group), "Jugador": _player_label(player_a, "A"), "Valor": _group_score(player_a, metrics)}
+        )
+        rows.append(
+            {"Grupo": t(group), "Jugador": _player_label(player_b, "B"), "Valor": _group_score(player_b, metrics)}
+        )
     frame = pd.DataFrame(rows)
     if frame.empty:
         return _empty_figure("Perfil por grupos")
@@ -125,14 +135,15 @@ def plot_player_profile_groups(comparison: dict[str, Any], player_colors: tuple[
         y="Valor",
         color="Jugador",
         barmode="group",
+        labels={"Grupo": t("Grupo"), "Jugador": t("Jugador"), "Valor": t("Valor")},
         color_discrete_sequence=[color_a, color_b],
     )
     figure.update_layout(
-        title="Perfil por grupos",
+        title=t("Perfil por grupos"),
         template="plotly_white",
         height=430,
-        yaxis_title="Score normalizado por grupo",
-        legend_title_text="Jugador",
+        yaxis_title=t("Score normalizado por grupo"),
+        legend_title_text=t("Jugador"),
         margin={"l": 40, "r": 25, "t": 65, "b": 95},
     )
     _legend_below(figure)
@@ -217,7 +228,7 @@ def _group_score(player: dict[str, Any], metrics: list[str]) -> float:
 def _player_label(player: dict[str, Any], fallback: str) -> str:
     name = player.get("player_name")
     if not name:
-        return f"Jugador {fallback}"
+        return f"{t('Jugador')} {fallback}"
     return str(name)
 
 
@@ -262,5 +273,5 @@ def _legend_below(figure: go.Figure) -> None:
 
 def _empty_figure(title: str) -> go.Figure:
     figure = go.Figure()
-    figure.update_layout(title=title, xaxis={"visible": False}, yaxis={"visible": False})
+    figure.update_layout(title=t(title), xaxis={"visible": False}, yaxis={"visible": False})
     return figure

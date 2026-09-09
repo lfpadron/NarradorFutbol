@@ -8,24 +8,39 @@ from typing import Any
 
 from src.narrative.fact_guard import validate_narrative_against_context
 from src.narrative_v2.style_profiles import get_style_profile
+from src.ui.i18n import is_english, translate_text
 
 
-def evaluate_style_fit(narrative: str, style_id: str, context: dict[str, Any]) -> dict[str, Any]:
+def evaluate_style_fit(
+    narrative: str,
+    style_id: str,
+    context: dict[str, Any],
+    language: str = "es",
+) -> dict[str, Any]:
     profile = get_style_profile(style_id)
     normalized = _normalize(narrative)
     words = re.findall(r"\w+", normalized)
-    missing_sections = [section for section in profile["expected_sections"] if _normalize(section) not in normalized]
+    expected_sections = [str(translate_text(section, language=language)) for section in profile["expected_sections"]]
+    missing_sections = [section for section in expected_sections if _normalize(section) not in normalized]
     structure_score = max(0, 100 - len(missing_sections) * 16)
-    audience_fit_score = _audience_fit_score(style_id, normalized)
+    audience_fit_score = _audience_fit_score(style_id, normalized, language=language)
     length_score = _length_score(len(words), profile["min_words"], profile["max_words"])
     fact_warnings = validate_narrative_against_context(_fact_guard_text(narrative), context)
     factuality_score = max(0, 100 - len(fact_warnings) * 15)
     style_score = round((structure_score + audience_fit_score + length_score + factuality_score) / 4)
     warnings = list(fact_warnings)
     if length_score < 70:
-        warnings.append("La longitud se aleja del rango esperado para el estilo.")
+        warnings.append(
+            "Length is outside the expected range for this style."
+            if is_english(language)
+            else "La longitud se aleja del rango esperado para el estilo."
+        )
     if missing_sections:
-        warnings.append("Faltan secciones esperadas para el perfil.")
+        warnings.append(
+            "Expected profile sections are missing."
+            if is_english(language)
+            else "Faltan secciones esperadas para el perfil."
+        )
 
     return {
         "style_score": style_score,
@@ -37,14 +52,24 @@ def evaluate_style_fit(narrative: str, style_id: str, context: dict[str, Any]) -
     }
 
 
-def _audience_fit_score(style_id: str, normalized: str) -> int:
-    checks = {
-        "tactico": ["dominio", "xg", "momentum", "presion", "ataques peligrosos"],
-        "television": ["ritmo", "momento clave", "figura", "cierre"],
-        "periodistico": ["titular", "bajada", "cronica", "claves"],
-        "scouting": ["fortalezas", "riesgos", "rol tactico", "jugadores"],
-        "ejecutivo": ["conclusion", "hallazgos", "implicaciones", "- "],
-    }
+def _audience_fit_score(style_id: str, normalized: str, language: str = "es") -> int:
+    checks = (
+        {
+            "tactico": ["dominance", "xg", "momentum", "pressure", "dangerous attacks"],
+            "television": ["rhythm", "key moment", "figure", "closing"],
+            "periodistico": ["headline", "standfirst", "chronicle", "keys"],
+            "scouting": ["strengths", "risks", "tactical role", "players"],
+            "ejecutivo": ["conclusion", "findings", "implications", "- "],
+        }
+        if is_english(language)
+        else {
+            "tactico": ["dominio", "xg", "momentum", "presion", "ataques peligrosos"],
+            "television": ["ritmo", "momento clave", "figura", "cierre"],
+            "periodistico": ["titular", "bajada", "cronica", "claves"],
+            "scouting": ["fortalezas", "riesgos", "rol tactico", "jugadores"],
+            "ejecutivo": ["conclusion", "hallazgos", "implicaciones", "- "],
+        }
+    )
     expected = checks[style_id]
     hits = sum(1 for item in expected if _normalize(item) in normalized)
     return round((hits / len(expected)) * 100)

@@ -16,6 +16,7 @@ from src.config import SCOUTING_DIR, project_relative
 from src.ingestion.utils import to_jsonable
 from src.reports.pdf_report import render_pdf_report
 from src.scouting.scouting_exporter import render_scouting_docx
+from src.ui.i18n import is_english, translate_text
 
 
 def save_scouting_v2_report(
@@ -64,7 +65,11 @@ def save_scouting_v2_report(
         save_result["html_status"] = "generated"
 
     if include_docx:
-        figures = [("Radar Scouting AI v2", radar_png)] if radar_png else None
+        figures = (
+            [("Scouting AI v2 Radar" if is_english(result.get("language")) else "Radar Scouting AI v2", radar_png)]
+            if radar_png
+            else None
+        )
         docx_result = render_scouting_docx(result, markdown_text, paths["docx"].as_posix(), figures=figures)
         docx_result["path"] = _public_path(docx_result.get("path") or paths["docx"])
         save_result["docx_status"] = docx_result["status"]
@@ -89,62 +94,83 @@ def render_scouting_v2_markdown(result: dict[str, Any]) -> str:
     profile_b = result.get("profile_b") or {}
     warnings = result.get("warnings", [])
     language_warnings = result.get("language_warnings", [])
+    language = result.get("language")
+    english = is_english(language)
+    mode_value = str(result.get("mode"))
+    if english and mode_value == "comparativo":
+        mode_value = "comparative"
     lines = [
-        "# Reporte Scouting AI v2",
+        "# Scouting AI v2 Report" if english else "# Reporte Scouting AI v2",
         "",
-        "## Datos generales",
+        "## General Information" if english else "## Datos generales",
         "",
-        f"- **Modo:** {result.get('mode')}",
-        f"- **Jugador A:** {profile_a.get('player_name')} ({profile_a.get('team_name')})",
+        f"- **{'Mode' if english else 'Modo'}:** {mode_value}",
+        f"- **{'Player A' if english else 'Jugador A'}:** {profile_a.get('player_name')} ({profile_a.get('team_name')})",
         f"- **Match ID A:** {result.get('match_id_a')}",
         f"- **Player ID A:** {result.get('player_id_a')}",
-        f"- **Arquetipo A:** {profile_a.get('archetype')} ({profile_a.get('confidence')}/100)",
+        f"- **{'Archetype A' if english else 'Arquetipo A'}:** {translate_text(profile_a.get('archetype'), language=language)} ({profile_a.get('confidence')}/100)",
     ]
     if result.get("mode") == "comparativo":
         lines.extend(
             [
-                f"- **Jugador B:** {profile_b.get('player_name')} ({profile_b.get('team_name')})",
+                f"- **{'Player B' if english else 'Jugador B'}:** {profile_b.get('player_name')} ({profile_b.get('team_name')})",
                 f"- **Match ID B:** {result.get('match_id_b')}",
                 f"- **Player ID B:** {result.get('player_id_b')}",
-                f"- **Arquetipo B:** {profile_b.get('archetype')} ({profile_b.get('confidence')}/100)",
+                f"- **{'Archetype B' if english else 'Arquetipo B'}:** {translate_text(profile_b.get('archetype'), language=language)} ({profile_b.get('confidence')}/100)",
             ]
         )
     lines.extend(
         [
-            f"- **Modelo:** {result.get('model')}",
-            f"- **Generado en:** {result.get('generated_at')}",
+            f"- **{'Model' if english else 'Modelo'}:** {result.get('model')}",
+            f"- **{'Generated at' if english else 'Generado en'}:** {result.get('generated_at')}",
             "",
             _strip_top_heading(str(result.get("narrative_markdown") or "")),
             "",
-            "## Tabla de perfiles",
+            "## Profile Table" if english else "## Tabla de perfiles",
             "",
-            "| Jugador | Arquetipo principal | Score | Arquetipo secundario | Score secundario |",
+            (
+                "| Player | Primary archetype | Score | Secondary archetype | Secondary score |"
+                if english
+                else "| Jugador | Arquetipo principal | Score | Arquetipo secundario | Score secundario |"
+            ),
             "| --- | --- | ---: | --- | ---: |",
-            _profile_row(profile_a),
+            _profile_row(profile_a, language),
         ]
     )
     if result.get("mode") == "comparativo":
-        lines.append(_profile_row(profile_b))
+        lines.append(_profile_row(profile_b, language))
 
-    lines.extend(["", "## Radar de perfil", ""])
-    lines.extend(_radar_table_lines(result.get("radar_metrics", {})))
+    lines.extend(["", "## Profile Radar" if english else "## Radar de perfil", ""])
+    lines.extend(_radar_table_lines(result.get("radar_metrics", {}), language))
 
-    lines.extend(["", "## Advertencias", ""])
+    lines.extend(["", "## Warnings" if english else "## Advertencias", ""])
     all_warnings = list(warnings)
-    all_warnings.extend(f"Lenguaje: {warning}" for warning in language_warnings)
+    all_warnings.extend(f"{'Language' if english else 'Lenguaje'}: {warning}" for warning in language_warnings)
     if all_warnings:
         lines.extend(f"- {warning}" for warning in all_warnings)
     else:
-        lines.append("- No se detectaron advertencias.")
+        lines.append("- No warnings were detected." if english else "- No se detectaron advertencias.")
 
     lines.extend(
         [
             "",
-            "## Trazabilidad",
+            "## Traceability" if english else "## Trazabilidad",
             "",
-            "- Fuente: StatsBomb Open Data transformada a DuckDB analítico.",
-            "- Perfil inferido desde métricas observadas: xG, tiros, pases clave, asistencias, pases, precisión, progresión, presión, duelos e impacto.",
-            "- El arquetipo describe comportamientos en el partido; no sustituye revisión de video ni muestra longitudinal.",
+            (
+                "- Source: StatsBomb Open Data transformed into analytical DuckDB tables."
+                if english
+                else "- Fuente: StatsBomb Open Data transformada a DuckDB analítico."
+            ),
+            (
+                "- Profile inferred from observed metrics: xG, shots, key passes, assists, passes, accuracy, progression, pressure, duels, and impact."
+                if english
+                else "- Perfil inferido desde métricas observadas: xG, tiros, pases clave, asistencias, pases, precisión, progresión, presión, duelos e impacto."
+            ),
+            (
+                "- The archetype describes match behaviours; it does not replace video review or a longitudinal sample."
+                if english
+                else "- El arquetipo describe comportamientos en el partido; no sustituye revisión de video ni muestra longitudinal."
+            ),
             "",
         ]
     )
@@ -159,9 +185,11 @@ def render_scouting_v2_html(
     markdown_text = markdown_text if markdown_text is not None else render_scouting_v2_markdown(result)
     body = markdown.markdown(markdown_text, extensions=["tables", "sane_lists"])
     title = html.escape(_html_title(result))
-    radar_html = _radar_html(radar_png)
+    language = result.get("language")
+    lang = "en" if is_english(language) else "es"
+    radar_html = _radar_html(radar_png, language)
     return f"""<!doctype html>
-<html lang="es">
+<html lang="{lang}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -269,15 +297,16 @@ def _build_paths(
         exported_at += timedelta(seconds=1)
 
 
-def _profile_row(profile: dict[str, Any]) -> str:
+def _profile_row(profile: dict[str, Any], language: object | None = None) -> str:
     secondary = profile.get("secondary_archetype", {})
     return (
-        f"| {profile.get('player_name')} | {profile.get('archetype')} | "
-        f"{profile.get('confidence')} | {secondary.get('name')} | {secondary.get('score')} |"
+        f"| {profile.get('player_name')} | {translate_text(profile.get('archetype'), language=language)} | "
+        f"{profile.get('confidence')} | {translate_text(secondary.get('name'), language=language)} | "
+        f"{secondary.get('score')} |"
     )
 
 
-def _radar_table_lines(radar_metrics: dict[str, Any]) -> list[str]:
+def _radar_table_lines(radar_metrics: dict[str, Any], language: object | None = None) -> list[str]:
     categories = list(radar_metrics.get("categories", []))
     player_a = radar_metrics.get("player_a", {})
     player_b = radar_metrics.get("player_b", {})
@@ -285,21 +314,35 @@ def _radar_table_lines(radar_metrics: dict[str, Any]) -> list[str]:
     values_b = list(player_b.get("values", []))
     has_player_b = bool(player_b.get("name"))
     if not categories:
-        return ["No hay métricas suficientes para construir radar."]
+        return [
+            (
+                "There are not enough metrics to build a radar."
+                if is_english(language)
+                else "No hay métricas suficientes para construir radar."
+            )
+        ]
     if has_player_b:
         lines = [
-            f"| Métrica | {player_a.get('name') or 'Jugador A'} | {player_b.get('name') or 'Jugador B'} |",
+            (
+                f"| Metric | {player_a.get('name') or 'Player A'} | {player_b.get('name') or 'Player B'} |"
+                if is_english(language)
+                else f"| Métrica | {player_a.get('name') or 'Jugador A'} | {player_b.get('name') or 'Jugador B'} |"
+            ),
             "| --- | ---: | ---: |",
         ]
         for category, value_a, value_b in zip(categories, values_a, values_b):
-            lines.append(f"| {category} | {value_a} | {value_b} |")
+            lines.append(f"| {translate_text(category, language=language)} | {value_a} | {value_b} |")
         return lines
     lines = [
-        f"| Métrica | {player_a.get('name') or 'Jugador A'} |",
+        (
+            f"| Metric | {player_a.get('name') or 'Player A'} |"
+            if is_english(language)
+            else f"| Métrica | {player_a.get('name') or 'Jugador A'} |"
+        ),
         "| --- | ---: |",
     ]
     for category, value_a in zip(categories, values_a):
-        lines.append(f"| {category} | {value_a} |")
+        lines.append(f"| {translate_text(category, language=language)} | {value_a} |")
     return lines
 
 
@@ -307,25 +350,37 @@ def _render_radar_png(result: dict[str, Any]) -> tuple[bytes | None, str | None]
     try:
         radar_metrics = result.get("radar_metrics", {})
         if not radar_metrics.get("categories"):
-            return None, "Radar sin categorías disponibles."
+            return None, (
+                "Radar has no available categories."
+                if is_english(result.get("language"))
+                else "Radar sin categorías disponibles."
+            )
         profile_a = result.get("profile_a", {})
         profile_b = result.get("profile_b") or {}
         colors = player_chart_colors(profile_a.get("team_name"), profile_b.get("team_name"))
         figure = plot_player_radar(radar_metrics, colors)
-        figure.update_layout(title="Radar Scouting AI v2", height=560)
+        figure.update_layout(
+            title="Scouting AI v2 Radar" if is_english(result.get("language")) else "Radar Scouting AI v2",
+            height=560,
+        )
         return figure.to_image(format="png", width=980, height=560, scale=2), None
     except Exception as exc:
         return None, str(exc)
 
 
-def _radar_html(radar_png: bytes | None) -> str:
+def _radar_html(radar_png: bytes | None, language: object | None = None) -> str:
     if not radar_png:
         return ""
     encoded = base64.b64encode(radar_png).decode("ascii")
+    caption = (
+        "Normalized 0-100 radar by observed tactical profile."
+        if is_english(language)
+        else "Radar normalizado 0-100 por perfil táctico observado."
+    )
     return f"""
     <figure class="radar-figure">
       <img src="data:image/png;base64,{encoded}" alt="Radar Scouting AI v2">
-      <figcaption>Radar normalizado 0-100 por perfil táctico observado.</figcaption>
+      <figcaption>{caption}</figcaption>
     </figure>
     """
 

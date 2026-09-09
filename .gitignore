@@ -1,10 +1,40 @@
 .env
+.env.*
+!.env.example
+!*.env.example
 deploy/cpanel/*.env
 __pycache__/
 *.py[cod]
 .venv/
 .uv-cache/
 .tmp/
+
+# Local snapshots and ad-hoc backups. These can become huge and should not be committed.
+diff_*.txt
+*.patch
+*.bak
+*.backup
+backup/
+backups/
+
+# Local secrets and SSH/API key material.
+*.key
+*.pem
+*.ppk
+*.p8
+*.p12
+*.pub
+id_rsa
+id_ed25519
+futbol
+futbol.pub
+
+# Local database files outside the managed data folders below.
+*.db
+*.duckdb
+*.duckdb.wal
+*.sqlite
+*.sqlite3
 
 input/*
 !input/.gitkeep

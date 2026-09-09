@@ -5,14 +5,16 @@ from __future__ import annotations
 import markdown
 
 from src.reports.markdown_report import render_markdown_report
+from src.ui.i18n import is_english
 
 
 def render_html_report(report: dict) -> str:
     markdown_text = render_markdown_report(report)
     body = markdown.markdown(markdown_text, extensions=["tables", "sane_lists"])
     title = _html_title(report)
+    lang = "en" if is_english(report.get("language")) else "es"
     return f"""<!doctype html>
-<html lang="es">
+<html lang="{lang}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -92,8 +94,9 @@ def render_html_report(report: dict) -> str:
 
 def _html_title(report: dict) -> str:
     summary = report.get("match_summary", {})
+    prefix = "Report" if is_english(report.get("language")) else "Reporte"
     return (
-        f"Reporte {summary.get('home_team_name', '')} "
+        f"{prefix} {summary.get('home_team_name', '')} "
         f"{summary.get('home_score', '')}-{summary.get('away_score', '')} "
         f"{summary.get('away_team_name', '')}"
     ).strip()

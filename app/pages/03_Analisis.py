@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -70,7 +71,13 @@ from src.ui.charts import momentum_line, shots_on_target_bar, xg_bar, xg_differe
 from src.ui.downloads import render_download_button, render_export_downloads
 from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_pct, format_score
-from src.ui.page_config import soccer_page_icon
+from src.ui.i18n import (
+    current_language,
+    is_english,
+    t,
+    translate_text,
+)
+from src.ui.navigation import ensure_page_shell
 from src.ui.pitch_charts import (
     plot_cumulative_xg,
     plot_pass_network,
@@ -79,9 +86,10 @@ from src.ui.pitch_charts import (
     plot_shot_map,
 )
 
-st.set_page_config(page_title="Análisis", page_icon=soccer_page_icon(), layout="wide")
+ensure_page_shell("Análisis")
 require_login()
 st.title("Análisis")
+language = current_language()
 
 
 def stop_with_footer() -> None:
@@ -143,10 +151,19 @@ def render_tab_pdf_button(
     key: str | None = None,
     disabled: bool = False,
 ) -> None:
-    button_key = key or f"export_pdf_{tab_name}_{match_id}"
+    selected_language = current_language()
+    base_button_key = key or f"export_pdf_{tab_name}_{match_id}"
+    button_key = f"{base_button_key}_{selected_language}"
     result_key = f"{button_key}_result"
     if st.button("Exportar PDF de esta pestaña", key=button_key, disabled=disabled):
-        st.session_state[result_key] = save_analysis_tab_pdf(tab_name, match_id, title, sections, figures)
+        st.session_state[result_key] = save_analysis_tab_pdf(
+            tab_name,
+            match_id,
+            title,
+            sections,
+            figures,
+            language=selected_language,
+        )
 
     result = st.session_state.get(result_key)
     if not result:
@@ -168,6 +185,396 @@ def table_rows(rows: object, limit: int = 24) -> list[dict[str, object]]:
     else:
         frame = pd.DataFrame(rows).head(limit)
     return frame.to_dict("records") if not frame.empty else []
+
+
+def moment_minute(moment: dict[str, object]) -> int:
+    try:
+        return int(moment.get("minute") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def moment_second(moment: dict[str, object]) -> int:
+    try:
+        return int(moment.get("second") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def format_match_clock(moment: dict[str, object]) -> str:
+    minute = moment_minute(moment)
+    second = moment_second(moment)
+    return f"{minute}:{second:02d}"
+
+
+def period_label(minute: int) -> str:
+    if is_english():
+        if minute <= 45:
+            return "1H"
+        if minute <= 90:
+            return "2H"
+        if minute <= 105:
+            return "ET1"
+        return "ET2"
+    if minute <= 45:
+        return "1T"
+    if minute <= 90:
+        return "2T"
+    if minute <= 105:
+        return "TE1"
+    return "TE2"
+
+
+def moment_type_label(moment_type: object) -> str:
+    labels = {
+        "goal": "Gol",
+        "assist": "Asistencia",
+        "big_chance": "Ocasión clara",
+        "yellow_card": "Tarjeta amarilla",
+        "red_card": "Tarjeta roja",
+        "penalty": "Penalti",
+        "substitution": "Cambio",
+    }
+    return str(t(labels.get(str(moment_type or ""), str(moment_type or "Evento"))))
+
+
+def split_match_brief_moments(key_moments: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+    goals = [moment for moment in key_moments if moment.get("type") == "goal"]
+    yellow_cards = [moment for moment in key_moments if moment.get("type") == "yellow_card"]
+    red_cards = [moment for moment in key_moments if moment.get("type") == "red_card"]
+    timeline = [
+        moment
+        for moment in key_moments
+        if moment.get("type") in {"goal", "red_card", "yellow_card", "penalty", "big_chance", "assist"}
+        or int(moment.get("importance_score") or 0) >= 70
+    ]
+    if not timeline:
+        timeline = sorted(key_moments, key=lambda row: int(row.get("importance_score") or 0), reverse=True)[:10]
+    timeline = sorted(timeline, key=lambda row: (moment_minute(row), moment_second(row)))
+    return {
+        "goals": goals,
+        "yellow_cards": yellow_cards,
+        "red_cards": red_cards,
+        "timeline": timeline,
+    }
+
+
+def match_brief_styles() -> str:
+    return """
+    <style>
+    .match-brief-shell {
+        border: 1px solid #d7dde8;
+        border-radius: 8px;
+        background: #ffffff;
+        overflow: hidden;
+        margin: 0.2rem 0 1rem;
+    }
+    .match-brief-scoreboard {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: stretch;
+        gap: 1px;
+        background: #d7dde8;
+    }
+    .match-brief-team,
+    .match-brief-score {
+        background: #f8fafc;
+        padding: 1rem;
+    }
+    .match-brief-team {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+    .match-brief-team.away {
+        justify-content: flex-end;
+        text-align: right;
+    }
+    .match-brief-shirt {
+        display: inline-grid;
+        place-items: center;
+        width: 2.2rem;
+        height: 2.2rem;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 1.25rem;
+        flex: 0 0 auto;
+    }
+    .match-brief-team-name {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+    .match-brief-team-label {
+        display: block;
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0;
+        margin-bottom: 0.18rem;
+    }
+    .match-brief-score {
+        min-width: 9rem;
+        text-align: center;
+        display: grid;
+        align-content: center;
+    }
+    .match-brief-scoreline {
+        font-size: 2.2rem;
+        line-height: 1;
+        font-weight: 900;
+        color: #0f172a;
+    }
+    .match-brief-date {
+        margin-top: 0.35rem;
+        color: #64748b;
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+    .match-brief-list {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.85rem;
+        background: #ffffff;
+        min-height: 11rem;
+    }
+    .match-brief-list h4 {
+        margin: 0 0 0.65rem;
+        color: #111827;
+        font-size: 0.95rem;
+        font-weight: 850;
+    }
+    .match-brief-mini-row {
+        display: grid;
+        grid-template-columns: 2.9rem 1.75rem minmax(0, 1fr);
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.42rem 0;
+        border-top: 1px solid #eef2f7;
+    }
+    .match-brief-mini-row:first-of-type {
+        border-top: 0;
+    }
+    .match-brief-minute {
+        color: #0f172a;
+        font-size: 0.84rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+    }
+    .match-brief-player-icon {
+        display: inline-grid;
+        place-items: center;
+        width: 1.55rem;
+        height: 1.55rem;
+        border-radius: 50%;
+        background: #e8eef7;
+        color: #0f172a;
+        font-size: 0.92rem;
+    }
+    .match-brief-player {
+        min-width: 0;
+        color: #111827;
+        font-size: 0.9rem;
+        font-weight: 760;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+    .match-brief-team-small {
+        display: block;
+        margin-top: 0.1rem;
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 650;
+    }
+    .match-brief-empty {
+        color: #64748b;
+        font-size: 0.9rem;
+        padding: 0.3rem 0;
+    }
+    .match-brief-timeline {
+        margin-top: 0.7rem;
+        display: grid;
+        gap: 0.65rem;
+    }
+    .match-brief-event {
+        display: grid;
+        grid-template-columns: 6.2rem minmax(0, 1fr);
+        gap: 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.85rem;
+        background: #ffffff;
+    }
+    .match-brief-event-time {
+        border-right: 1px solid #e2e8f0;
+        padding-right: 0.75rem;
+    }
+    .match-brief-period {
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .match-brief-clock {
+        color: #0f172a;
+        font-size: 1.15rem;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+    }
+    .match-brief-event-title {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: #111827;
+        font-size: 0.98rem;
+        font-weight: 850;
+        line-height: 1.2;
+    }
+    .match-brief-event-type {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0.15rem 0.45rem;
+        background: #e8eef7;
+        color: #334155;
+        font-size: 0.72rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+    .match-brief-event-description {
+        margin-top: 0.35rem;
+        color: #475569;
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+    @media (max-width: 720px) {
+        .match-brief-scoreboard {
+            grid-template-columns: 1fr;
+        }
+        .match-brief-team.away {
+            justify-content: flex-start;
+            text-align: left;
+        }
+        .match-brief-score {
+            min-width: 0;
+        }
+        .match-brief-event {
+            grid-template-columns: 1fr;
+        }
+        .match-brief-event-time {
+            border-right: 0;
+            border-bottom: 1px solid #e2e8f0;
+            padding-right: 0;
+            padding-bottom: 0.55rem;
+        }
+    }
+    </style>
+    """
+
+
+def render_match_scoreboard(summary: dict[str, object]) -> None:
+    home_name = escape(str(summary.get("home_team_name") or t("Local")))
+    away_name = escape(str(summary.get("away_team_name") or t("Visitante")))
+    home_score = escape(str(summary.get("home_score") if summary.get("home_score") is not None else "-"))
+    away_score = escape(str(summary.get("away_score") if summary.get("away_score") is not None else "-"))
+    match_date = escape(str(summary.get("match_date") or t("Fecha no disponible")))
+    home_label = escape(str(t("Local")))
+    away_label = escape(str(t("Visitante")))
+    st.markdown(
+        f"""
+        <div class="match-brief-shell">
+            <div class="match-brief-scoreboard">
+                <div class="match-brief-team">
+                    <span class="match-brief-shirt">&#128085;</span>
+                    <div>
+                        <span class="match-brief-team-label">{home_label}</span>
+                        <div class="match-brief-team-name">{home_name}</div>
+                    </div>
+                </div>
+                <div class="match-brief-score">
+                    <div class="match-brief-scoreline">{home_score} - {away_score}</div>
+                    <div class="match-brief-date">{match_date}</div>
+                </div>
+                <div class="match-brief-team away">
+                    <div>
+                        <span class="match-brief-team-label">{away_label}</span>
+                        <div class="match-brief-team-name">{away_name}</div>
+                    </div>
+                    <span class="match-brief-shirt">&#128085;</span>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_brief_moment_list(title: str, moments: list[dict[str, object]], empty_text: str) -> None:
+    rows = []
+    for moment in moments:
+        player = escape(str(moment.get("player_name") or t("Jugador no disponible")))
+        team = escape(str(moment.get("team_name") or t("Equipo no disponible")))
+        rows.append(f"""
+            <div class="match-brief-mini-row">
+                <span class="match-brief-minute">{escape(format_match_clock(moment))}</span>
+                <span class="match-brief-player-icon">&#128100;</span>
+                <span class="match-brief-player">{player}<span class="match-brief-team-small">{team}</span></span>
+            </div>
+            """)
+    body = "\n".join(rows) if rows else f'<div class="match-brief-empty">{escape(str(t(empty_text)))}</div>'
+    title_label = escape(str(t(title)))
+    st.markdown(
+        f"""
+        <div class="match-brief-list">
+            <h4>{title_label}</h4>
+            {body}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_brief_event_timeline(events: list[dict[str, object]]) -> None:
+    if not events:
+        st.info("No se detectaron eventos importantes para este partido.")
+        return
+    rows = []
+    for event in events:
+        minute = moment_minute(event)
+        selected_language = current_language()
+        player = escape(str(event.get("player_name") or t("Jugador no disponible")))
+        title = escape(
+            str(translate_text(event.get("title") or moment_type_label(event.get("type")), language=selected_language))
+        )
+        description = escape(
+            str(translate_text(event.get("description") or "Sin narración disponible.", language=selected_language))
+        )
+        event_type = escape(moment_type_label(event.get("type")))
+        team = escape(str(event.get("team_name") or t("Equipo no disponible")))
+        rows.append(f"""
+            <div class="match-brief-event">
+                <div class="match-brief-event-time">
+                    <div class="match-brief-period">{period_label(minute)}</div>
+                    <div class="match-brief-clock">{escape(format_match_clock(event))}</div>
+                </div>
+                <div>
+                    <div class="match-brief-event-title">
+                        <span class="match-brief-player-icon">&#128100;</span>
+                        <span>{title}</span>
+                        <span class="match-brief-event-type">{event_type}</span>
+                    </div>
+                    <div class="match-brief-event-description">
+                        <strong>{player}</strong> | {team}. {description}
+                    </div>
+                </div>
+            </div>
+            """)
+    st.markdown(f'<div class="match-brief-timeline">{"".join(rows)}</div>', unsafe_allow_html=True)
 
 
 try:
@@ -208,10 +615,7 @@ match_score_label = format_score(
     summary.get("away_team_name"),
 )
 
-st.caption(
-    f"{summary.get('match_date')} | "
-    f"{match_score_label}"
-)
+st.caption(f"{summary.get('match_date')} | " f"{match_score_label}")
 
 tabs = st.tabs(
     [
@@ -234,8 +638,93 @@ tabs = st.tabs(
 )
 
 with tabs[0]:
-    st.subheader("Resumen del partido")
-    st.write("Vista general del partido y métricas agregadas por equipo y jugador.")
+    st.subheader("Ficha del partido")
+    key_moments = detail["key_moments"]
+    match_brief = split_match_brief_moments(key_moments)
+    st.markdown(match_brief_styles(), unsafe_allow_html=True)
+    render_match_scoreboard(summary)
+
+    summary_cols = st.columns(3)
+    with summary_cols[0]:
+        render_brief_moment_list("Goles", match_brief["goals"], "Sin goles registrados.")
+    with summary_cols[1]:
+        render_brief_moment_list("Tarjetas rojas", match_brief["red_cards"], "Sin tarjetas rojas registradas.")
+    with summary_cols[2]:
+        render_brief_moment_list(
+            "Tarjetas amarillas", match_brief["yellow_cards"], "Sin tarjetas amarillas registradas."
+        )
+
+    st.subheader("Eventos más importantes")
+    render_brief_event_timeline(match_brief["timeline"])
+
+    render_tab_pdf_button(
+        "resumen_partido",
+        match_id,
+        f"Resumen del partido | {match_score_label}",
+        [
+            {
+                "heading": "Marcador",
+                "rows": [
+                    {
+                        "local": summary.get("home_team_name"),
+                        "goles_local": summary.get("home_score"),
+                        "visitante": summary.get("away_team_name"),
+                        "goles_visitante": summary.get("away_score"),
+                        "fecha": summary.get("match_date"),
+                    }
+                ],
+            },
+            {
+                "heading": "Goles",
+                "rows": [
+                    {
+                        "minuto": format_match_clock(moment),
+                        "jugador": moment.get("player_name"),
+                        "equipo": moment.get("team_name"),
+                    }
+                    for moment in match_brief["goals"]
+                ],
+            },
+            {
+                "heading": "Tarjetas rojas",
+                "rows": [
+                    {
+                        "minuto": format_match_clock(moment),
+                        "jugador": moment.get("player_name"),
+                        "equipo": moment.get("team_name"),
+                    }
+                    for moment in match_brief["red_cards"]
+                ],
+            },
+            {
+                "heading": "Tarjetas amarillas",
+                "rows": [
+                    {
+                        "minuto": format_match_clock(moment),
+                        "jugador": moment.get("player_name"),
+                        "equipo": moment.get("team_name"),
+                    }
+                    for moment in match_brief["yellow_cards"]
+                ],
+            },
+            {
+                "heading": "Eventos importantes",
+                "rows": [
+                    {
+                        "tiempo": period_label(moment_minute(moment)),
+                        "minuto": format_match_clock(moment),
+                        "tipo": moment_type_label(moment.get("type")),
+                        "jugador": moment.get("player_name"),
+                        "narracion": moment.get("description"),
+                    }
+                    for moment in match_brief["timeline"]
+                ],
+            },
+        ],
+        key=f"export_pdf_resumen_partido_{match_id}",
+    )
+
+    st.subheader("Métricas rápidas")
     cols = st.columns(5)
     cols[0].metric(
         "Marcador",
@@ -478,14 +967,14 @@ with tabs[6]:
     if not api_key_available:
         st.warning("OPENAI_API_KEY no está configurada. Se generará narrativa local de respaldo.")
 
-    result_key = f"narrative_result_{match_id}_{selected_tone}"
-    quality_key = f"narrative_quality_{match_id}_{selected_tone}"
-    comparison_key = f"tone_comparison_{match_id}"
-    review_key = f"review_report_{match_id}"
-    narrative_paths_key = f"narrative_paths_{match_id}_{selected_tone}"
-    review_paths_key = f"review_paths_{match_id}"
-    final_report_key = f"final_report_{match_id}_{selected_tone}"
-    final_report_paths_key = f"final_report_paths_{match_id}_{selected_tone}"
+    result_key = f"narrative_result_{language}_{match_id}_{selected_tone}"
+    quality_key = f"narrative_quality_{language}_{match_id}_{selected_tone}"
+    comparison_key = f"tone_comparison_{language}_{match_id}"
+    review_key = f"review_report_{language}_{match_id}"
+    narrative_paths_key = f"narrative_paths_{language}_{match_id}_{selected_tone}"
+    review_paths_key = f"review_paths_{language}_{match_id}"
+    final_report_key = f"final_report_{language}_{match_id}_{selected_tone}"
+    final_report_paths_key = f"final_report_paths_{language}_{match_id}_{selected_tone}"
     action_cols = st.columns(2)
     if action_cols[0].button("Generar narración"):
         with st.spinner("Generando narración..."):
@@ -493,6 +982,7 @@ with tabs[6]:
                 match_id,
                 selected_tone,
                 use_api=use_api,
+                language=language,
             )
             st.session_state.pop(narrative_paths_key, None)
 
@@ -507,7 +997,12 @@ with tabs[6]:
     if review_cols[0].button("Evaluar calidad"):
         with st.spinner("Evaluando calidad narrativa..."):
             if current_result is None:
-                current_result = generate_match_narrative(match_id, selected_tone, use_api=use_api)
+                current_result = generate_match_narrative(
+                    match_id,
+                    selected_tone,
+                    use_api=use_api,
+                    language=language,
+                )
                 st.session_state[result_key] = current_result
             st.session_state[quality_key] = evaluate_narrative_quality(
                 str(current_result.get("narrative_markdown") or ""),
@@ -516,11 +1011,16 @@ with tabs[6]:
 
     if review_cols[1].button("Comparar tonos"):
         with st.spinner("Comparando tonos..."):
-            st.session_state[comparison_key] = compare_tones(match_id, tones=None, use_api=use_api)
+            st.session_state[comparison_key] = compare_tones(
+                match_id,
+                tones=None,
+                use_api=use_api,
+                language=language,
+            )
 
     if review_cols[2].button("Guardar revisión"):
         with st.spinner("Construyendo revisión..."):
-            report = build_review_report(match_id, use_api=use_api)
+            report = build_review_report(match_id, use_api=use_api, language=language)
             md_path, json_path = save_review_report(report)
             st.session_state[review_key] = report
             st.session_state[review_paths_key] = {"markdown": md_path, "json": json_path}
@@ -530,7 +1030,7 @@ with tabs[6]:
     if narrative_paths:
         render_export_downloads(
             narrative_paths,
-            key_prefix=f"narrative_downloads_{match_id}_{selected_tone}",
+            key_prefix=f"narrative_downloads_{language}_{match_id}_{selected_tone}",
             keys=("markdown", "json"),
         )
 
@@ -538,7 +1038,7 @@ with tabs[6]:
     if review_paths:
         render_export_downloads(
             review_paths,
-            key_prefix=f"review_downloads_{match_id}",
+            key_prefix=f"review_downloads_{language}_{match_id}",
             keys=("markdown", "json"),
         )
 
@@ -546,7 +1046,7 @@ with tabs[6]:
         status_cols = st.columns(3)
         status_cols[0].metric("Status", current_result.get("status"))
         status_cols[1].metric("Modelo", current_result.get("model"))
-        status_cols[2].metric("Tono", SUPPORTED_TONES.get(str(current_result.get("tone")), "N/D"))
+        status_cols[2].metric("Tono", t(SUPPORTED_TONES.get(str(current_result.get("tone")), "N/D")))
 
         warnings = current_result.get("warnings", [])
         if warnings:
@@ -651,7 +1151,7 @@ with tabs[6]:
     report_cols = st.columns(2)
     if report_cols[0].button("Generar reporte"):
         with st.spinner("Generando reporte final..."):
-            final_report = build_match_report(match_id, tone=selected_tone, use_api=use_api)
+            final_report = build_match_report(match_id, tone=selected_tone, use_api=use_api, language=language)
             st.session_state[final_report_key] = {
                 "report": final_report,
                 "markdown": render_markdown_report(final_report),
@@ -693,7 +1193,10 @@ with tabs[6]:
                 st.write(f"- {format_labels[label]}: {path}")
         render_export_downloads(
             report_paths,
-            key_prefix=f"final_report_base_downloads_{match_id}_{selected_tone}_{report_paths.get('export_suffix', '')}",
+            key_prefix=(
+                f"final_report_base_downloads_{language}_{match_id}_{selected_tone}_"
+                f"{report_paths.get('export_suffix', '')}"
+            ),
             keys=("markdown", "html", "json"),
             labels=format_labels,
         )
@@ -708,7 +1211,10 @@ with tabs[6]:
         if optional_paths:
             render_export_downloads(
                 report_paths,
-                key_prefix=f"final_report_extra_downloads_{match_id}_{selected_tone}_{report_paths.get('export_suffix', '')}",
+                key_prefix=(
+                    f"final_report_extra_downloads_{language}_{match_id}_{selected_tone}_"
+                    f"{report_paths.get('export_suffix', '')}"
+                ),
                 keys=("pdf", "docx"),
                 labels=format_labels,
             )
@@ -765,11 +1271,11 @@ with tabs[7]:
     if not api_key_available_v2:
         st.warning("OPENAI_API_KEY no está configurada. Narrador AI v2 usará fallback local.")
 
-    st.caption(f"Audiencia: {selected_profile['audience']} | Objetivo: {selected_profile['objective']}")
+    st.caption(f"Audiencia: {t(selected_profile['audience'])} | Objetivo: {t(selected_profile['objective'])}")
 
-    v2_result_key = f"narrative_v2_result_{match_id}_{selected_style_id}"
-    v2_comparison_key = f"narrative_v2_comparison_{match_id}"
-    v2_paths_key = f"narrative_v2_paths_{match_id}_{selected_style_id}"
+    v2_result_key = f"narrative_v2_result_{language}_{match_id}_{selected_style_id}"
+    v2_comparison_key = f"narrative_v2_comparison_{language}_{match_id}"
+    v2_paths_key = f"narrative_v2_paths_{language}_{match_id}_{selected_style_id}"
     v2_export_cols = st.columns(2)
     v2_include_pdf = v2_export_cols[0].checkbox(
         "Generar PDF",
@@ -789,6 +1295,7 @@ with tabs[7]:
                 match_id,
                 selected_style_id,
                 use_api=use_api_v2,
+                language=language,
             )
             st.session_state.pop(v2_paths_key, None)
 
@@ -797,6 +1304,7 @@ with tabs[7]:
             st.session_state[v2_comparison_key] = compare_specialized_styles(
                 match_id,
                 use_api=use_api_v2,
+                language=language,
             )
 
     v2_result = st.session_state.get(v2_result_key)
@@ -823,7 +1331,10 @@ with tabs[7]:
                 st.write(f"**{label}:** `{v2_paths[key]}`")
         render_export_downloads(
             v2_paths,
-            key_prefix=f"narrative_v2_downloads_{match_id}_{selected_style_id}_{v2_paths.get('export_suffix', '')}",
+            key_prefix=(
+                f"narrative_v2_downloads_{language}_{match_id}_{selected_style_id}_"
+                f"{v2_paths.get('export_suffix', '')}"
+            ),
             keys=("markdown", "html", "json", "pdf", "docx"),
         )
         v2_status_cols = st.columns(2)
@@ -1085,8 +1596,8 @@ with tabs[9]:
     comparison_match_a = options[comparison_label_a]
     comparison_match_b = options[comparison_label_b]
     comparison_key = f"comparison_{comparison_match_a}_{comparison_match_b}"
-    comparison_narrative_key = f"comparison_narrative_{comparison_match_a}_{comparison_match_b}"
-    comparison_paths_key = f"comparison_paths_{comparison_match_a}_{comparison_match_b}"
+    comparison_narrative_key = f"comparison_narrative_{language}_{comparison_match_a}_{comparison_match_b}"
+    comparison_paths_key = f"comparison_paths_{language}_{comparison_match_a}_{comparison_match_b}"
 
     comparison_actions = st.columns(3)
     if comparison_actions[0].button("Comparar partidos"):
@@ -1110,6 +1621,7 @@ with tabs[9]:
                     comparison_match_a,
                     comparison_match_b,
                     use_api=False,
+                    language=language,
                 )
             except Exception as exc:
                 st.error(f"No se pudo generar narrativa comparativa: {exc}")
@@ -1133,7 +1645,7 @@ with tabs[9]:
         render_export_downloads(
             comparison_paths,
             key_prefix=(
-                f"match_comparison_downloads_{comparison_match_a}_{comparison_match_b}_"
+                f"match_comparison_downloads_{language}_{comparison_match_a}_{comparison_match_b}_"
                 f"{comparison_paths.get('export_suffix', '')}"
             ),
             keys=("markdown", "json"),
@@ -1328,9 +1840,11 @@ with tabs[10]:
         player_id_b = player_options_b[selected_player_label_b]
         player_comparison_key = f"player_comparison_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
         player_narrative_key = (
-            f"player_comparison_narrative_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+            f"player_comparison_narrative_{language}_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
         )
-        player_paths_key = f"player_comparison_paths_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+        player_paths_key = (
+            f"player_comparison_paths_{language}_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+        )
 
         player_action_cols = st.columns(3)
         if player_action_cols[0].button("Comparar jugadores"):
@@ -1361,6 +1875,7 @@ with tabs[10]:
                         player_match_b,
                         player_id_b,
                         use_api=False,
+                        language=language,
                     )
                 except Exception as exc:
                     st.error(f"No se pudo generar narrativa comparativa: {exc}")
@@ -1384,7 +1899,7 @@ with tabs[10]:
             render_export_downloads(
                 player_paths,
                 key_prefix=(
-                    f"player_comparison_downloads_{player_match_a}_{player_id_a}_"
+                    f"player_comparison_downloads_{language}_{player_match_a}_{player_id_a}_"
                     f"{player_match_b}_{player_id_b}_{player_paths.get('export_suffix', '')}"
                 ),
                 keys=("markdown", "json"),
@@ -1570,8 +2085,10 @@ with tabs[10]:
             key=f"scouting_export_pdf_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}",
         )
 
-        scouting_result_key = f"scouting_result_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
-        scouting_paths_key = f"scouting_paths_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+        scouting_result_key = (
+            f"scouting_result_{language}_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
+        )
+        scouting_paths_key = f"scouting_paths_{language}_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}"
         scouting_cols = st.columns(4)
         if scouting_cols[0].button(
             "Scouting individual A",
@@ -1583,6 +2100,7 @@ with tabs[10]:
                         player_match_a,
                         player_id_a,
                         use_api=scouting_use_api,
+                        language=language,
                     )
                     st.session_state.pop(scouting_paths_key, None)
                 except Exception as exc:
@@ -1598,6 +2116,7 @@ with tabs[10]:
                         player_match_b,
                         player_id_b,
                         use_api=scouting_use_api,
+                        language=language,
                     )
                     st.session_state.pop(scouting_paths_key, None)
                 except Exception as exc:
@@ -1615,6 +2134,7 @@ with tabs[10]:
                         player_match_b,
                         player_id_b,
                         use_api=scouting_use_api,
+                        language=language,
                     )
                     st.session_state.pop(scouting_paths_key, None)
                 except Exception as exc:
@@ -1670,7 +2190,7 @@ with tabs[10]:
                 scouting_paths,
                 key_prefix=(
                     "scouting_downloads_"
-                    f"{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}_"
+                    f"{language}_{player_match_a}_{player_id_a}_{player_match_b}_{player_id_b}_"
                     f"{scouting_paths.get('export_suffix', '')}"
                 ),
                 keys=("markdown", "html", "json", "pdf", "docx"),
@@ -1774,8 +2294,8 @@ with tabs[11]:
         v2_include_docx = export_v2_cols[1].checkbox("Generar DOCX", value=False, key="scouting_v2_docx")
         v2_include_pdf = export_v2_cols[2].checkbox("Generar PDF", value=False, key="scouting_v2_pdf")
 
-        v2_result_key = f"scouting_v2_result_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}"
-        v2_paths_key = f"scouting_v2_paths_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}"
+        v2_result_key = f"scouting_v2_result_{language}_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}"
+        v2_paths_key = f"scouting_v2_paths_{language}_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}"
         v2_action_cols = st.columns(2)
         can_generate_v2 = v2_mode == "Individual" or (v2_match_b is not None and v2_player_b is not None)
         if v2_action_cols[0].button("Generar Scouting AI v2", disabled=not can_generate_v2):
@@ -1787,9 +2307,14 @@ with tabs[11]:
                             v2_player_a,
                             int(v2_match_b),
                             int(v2_player_b),
+                            language=language,
                         )
                     else:
-                        st.session_state[v2_result_key] = generate_scouting_v2(v2_match_a, v2_player_a)
+                        st.session_state[v2_result_key] = generate_scouting_v2(
+                            v2_match_a,
+                            v2_player_a,
+                            language=language,
+                        )
                     st.session_state.pop(v2_paths_key, None)
                 except Exception as exc:
                     st.error(f"No se pudo generar Scouting AI v2: {exc}")
@@ -1901,7 +2426,7 @@ with tabs[11]:
                 v2_paths,
                 key_prefix=(
                     "scouting_v2_downloads_"
-                    f"{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}_"
+                    f"{language}_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}_"
                     f"{v2_paths.get('export_suffix', '')}"
                 ),
                 keys=("markdown", "html", "json", "pdf", "docx"),

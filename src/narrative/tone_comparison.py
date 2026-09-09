@@ -9,6 +9,7 @@ from src.ingestion.utils import to_jsonable
 from src.narrative.config import SUPPORTED_TONES, validate_tone
 from src.narrative.narrator import generate_match_narrative
 from src.narrative.quality_checker import evaluate_narrative_quality
+from src.ui.i18n import tone_display_name
 
 DEFAULT_COMPARISON_TONES = [
     "cronica_emocionante",
@@ -19,7 +20,12 @@ DEFAULT_COMPARISON_TONES = [
 ]
 
 
-def compare_tones(match_id: int, tones: list[str] | None = None, use_api: bool = False) -> dict[str, Any]:
+def compare_tones(
+    match_id: int,
+    tones: list[str] | None = None,
+    use_api: bool = False,
+    language: str = "es",
+) -> dict[str, Any]:
     selected_tones = tones or DEFAULT_COMPARISON_TONES
     for tone in selected_tones:
         validate_tone(tone)
@@ -27,7 +33,7 @@ def compare_tones(match_id: int, tones: list[str] | None = None, use_api: bool =
     context = build_ai_match_context(match_id)
     rows: list[dict[str, Any]] = []
     for tone in selected_tones:
-        result = generate_match_narrative(match_id, tone=tone, use_api=use_api)
+        result = generate_match_narrative(match_id, tone=tone, use_api=use_api, language=language)
         quality = evaluate_narrative_quality(result["narrative_markdown"], context)
         generation_warnings = list(result.get("warnings") or [])
         narrative_warnings = [warning for warning in generation_warnings if not _is_operational_warning(str(warning))]
@@ -35,7 +41,7 @@ def compare_tones(match_id: int, tones: list[str] | None = None, use_api: bool =
         rows.append(
             {
                 "tone": tone,
-                "tone_label": SUPPORTED_TONES[tone],
+                "tone_label": tone_display_name(tone, SUPPORTED_TONES[tone], language=language),
                 "status": result.get("status"),
                 "overall_score": quality["overall_score"],
                 "factuality_score": quality["factuality_score"],
@@ -55,6 +61,7 @@ def compare_tones(match_id: int, tones: list[str] | None = None, use_api: bool =
     return to_jsonable(
         {
             "match_id": match_id,
+            "language": language,
             "tones": rows,
             "best_tone": best.get("tone") if best else None,
             "best_tone_label": best.get("tone_label") if best else None,

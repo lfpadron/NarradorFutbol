@@ -14,9 +14,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config import INGESTION_LOG_DB
 from src.security.streamlit_auth import require_login
 from src.ui.footer import render_footer
-from src.ui.page_config import soccer_page_icon
+from src.ui.navigation import ensure_page_shell
 
-st.set_page_config(page_title="Ingesta", page_icon=soccer_page_icon(), layout="wide")
+ensure_page_shell("Ingesta")
 require_login()
 st.title("Ingesta")
 

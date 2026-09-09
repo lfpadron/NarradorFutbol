@@ -9,6 +9,7 @@ from typing import Any
 
 from src.config import COMPARISONS_DIR, project_relative
 from src.ingestion.utils import to_jsonable
+from src.ui.i18n import is_english, translate_text
 
 
 def render_player_comparison_markdown(
@@ -20,29 +21,31 @@ def render_player_comparison_markdown(
     match_a = comparison.get("match_a", {})
     match_b = comparison.get("match_b", {})
     summary = comparison.get("summary_comparison", {})
+    language = (narrative or {}).get("language")
+    english = is_english(language)
     lines = [
-        "# Comparación de jugadores",
+        "# Player Comparison" if english else "# Comparación de jugadores",
         "",
-        "## Jugadores",
+        "## Players" if english else "## Jugadores",
         "",
-        f"- **Jugador A:** `{player_a.get('player_id')}` | {player_a.get('player_name')} ({player_a.get('team_name')}) | {match_a.get('scoreline')}",
-        f"- **Jugador B:** `{player_b.get('player_id')}` | {player_b.get('player_name')} ({player_b.get('team_name')}) | {match_b.get('scoreline')}",
+        f"- **{'Player A' if english else 'Jugador A'}:** `{player_a.get('player_id')}` | {player_a.get('player_name')} ({player_a.get('team_name')}) | {match_a.get('scoreline')}",
+        f"- **{'Player B' if english else 'Jugador B'}:** `{player_b.get('player_id')}` | {player_b.get('player_name')} ({player_b.get('team_name')}) | {match_b.get('scoreline')}",
         "",
-        "## Diferencias principales",
+        "## Main Differences" if english else "## Diferencias principales",
         "",
-        "| Métrica | Diferencia B-A |",
+        "| Metric | B-A difference |" if english else "| Métrica | Diferencia B-A |",
         "| --- | ---: |",
-        f"| Goles | {summary.get('diff_goals')} |",
+        f"| {translate_text('Goles', language=language)} | {summary.get('diff_goals')} |",
         f"| xG | {summary.get('diff_xg')} |",
-        f"| Tiros | {summary.get('diff_shots')} |",
-        f"| Asistencias | {summary.get('diff_assists')} |",
-        f"| Pases clave | {summary.get('diff_key_passes')} |",
-        f"| Presiones | {summary.get('diff_pressures')} |",
+        f"| {translate_text('Tiros', language=language)} | {summary.get('diff_shots')} |",
+        f"| {translate_text('Asistencias', language=language)} | {summary.get('diff_assists')} |",
+        f"| {translate_text('Pases clave', language=language)} | {summary.get('diff_key_passes')} |",
+        f"| {translate_text('Presiones', language=language)} | {summary.get('diff_pressures')} |",
         f"| Impact score | {summary.get('diff_impact_score')} |",
         "",
-        "## Tabla comparativa",
+        "## Comparative Table" if english else "## Tabla comparativa",
         "",
-        "| Métrica | Jugador A | Jugador B |",
+        "| Metric | Player A | Player B |" if english else "| Métrica | Jugador A | Jugador B |",
         "| --- | ---: | ---: |",
     ]
     for label, key in (
@@ -63,15 +66,22 @@ def render_player_comparison_markdown(
         ("Faltas recibidas", "fouls_won"),
         ("Impact score", "impact_score"),
     ):
-        lines.append(f"| {label} | {player_a.get(key)} | {player_b.get(key)} |")
+        lines.append(f"| {translate_text(label, language=language)} | {player_a.get(key)} | {player_b.get(key)} |")
 
     warnings = comparison.get("warnings", [])
     if warnings:
-        lines.extend(["", "## Advertencias", ""])
+        lines.extend(["", "## Warnings" if english else "## Advertencias", ""])
         lines.extend(f"- {warning}" for warning in warnings)
 
     if narrative:
-        lines.extend(["", "## Narrativa comparativa", "", str(narrative.get("narrative_markdown") or "")])
+        lines.extend(
+            [
+                "",
+                "## Comparative Narrative" if english else "## Narrativa comparativa",
+                "",
+                str(narrative.get("narrative_markdown") or ""),
+            ]
+        )
 
     lines.append("")
     return "\n".join(lines)

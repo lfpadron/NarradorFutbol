@@ -19,6 +19,7 @@ from src.analytics.pitch import (
     pitch_bin,
     zone_label,
 )
+from src.ui.i18n import t
 
 RECOVERY_TYPES = {"Ball Recovery", "Interception"}
 LOSS_TYPES = {"Dispossessed", "Miscontrol", "Error"}
@@ -251,7 +252,7 @@ def plot_event_heatmap(
                 showscale=False,
                 showlegend=True,
                 name=_team_role_label(team_name, home_team_name, away_team_name),
-                hovertemplate="x: %{x}<br>y: %{y}<br>eventos: %{z}<extra></extra>",
+                hovertemplate=f"x: %{{x}}<br>y: %{{y}}<br>{t('eventos')}: %{{z}}<extra></extra>",
             )
         )
     _legend_below(figure)
@@ -271,7 +272,9 @@ def plot_shots_advanced(
     frame = pd.DataFrame(rows)
     frame["xg"] = pd.to_numeric(frame.get("shot_statsbomb_xg"), errors="coerce").fillna(0)
     frame["is_goal"] = frame["shot_outcome_name"].eq("Goal")
-    frame["display_x"] = frame.apply(lambda row: _oriented_x(row["location_x"], row.get("team_name"), away_team_name), axis=1)
+    frame["display_x"] = frame.apply(
+        lambda row: _oriented_x(row["location_x"], row.get("team_name"), away_team_name), axis=1
+    )
     frame["display_y"] = pd.to_numeric(frame["location_y"], errors="coerce")
     for team_name in _ordered_teams(frame["team_name"].dropna().unique().tolist(), home_team_name, away_team_name):
         team_subset = frame[frame["team_name"] == team_name]
@@ -288,7 +291,7 @@ def plot_shots_advanced(
                     x=subset["display_x"],
                     y=subset["display_y"],
                     mode="markers",
-                    name=f"{team_label} - {event_label}",
+                    name=f"{team_label} - {t(event_label)}",
                     marker={
                         "size": subset["xg"].map(lambda value: 9 + max(float(value), 0) ** 0.5 * 30),
                         "color": color,
@@ -299,10 +302,10 @@ def plot_shots_advanced(
                     customdata=subset[["team_name", "player_name", "minute", "second", "xg", "shot_outcome_name"]],
                     hovertemplate=(
                         "<b>%{customdata[1]}</b><br>"
-                        "Equipo: %{customdata[0]}<br>"
-                        "Minuto: %{customdata[2]}:%{customdata[3]:02d}<br>"
+                        f"{t('Equipo')}: %{{customdata[0]}}<br>"
+                        f"{t('Minuto')}: %{{customdata[2]}}:%{{customdata[3]:02d}}<br>"
                         "xG: %{customdata[4]:.2f}<br>"
-                        "Resultado: %{customdata[5]}<extra></extra>"
+                        f"{t('Resultado')}: %{{customdata[5]}}<extra></extra>"
                     ),
                 )
             )
@@ -327,8 +330,12 @@ def plot_pass_map(
         return annotate_empty(figure, "Sin pases con coordenadas")
 
     frame = pd.DataFrame(rows).head(max_arrows)
-    frame["start_x"] = frame.apply(lambda row: _oriented_x(row["location_x"], row.get("team_name"), away_team_name), axis=1)
-    frame["end_x"] = frame.apply(lambda row: _oriented_x(row["pass_end_x"], row.get("team_name"), away_team_name), axis=1)
+    frame["start_x"] = frame.apply(
+        lambda row: _oriented_x(row["location_x"], row.get("team_name"), away_team_name), axis=1
+    )
+    frame["end_x"] = frame.apply(
+        lambda row: _oriented_x(row["pass_end_x"], row.get("team_name"), away_team_name), axis=1
+    )
     for team_name in _ordered_teams(frame["team_name"].dropna().unique().tolist(), home_team_name, away_team_name):
         subset = frame[frame["team_name"] == team_name]
         color = _team_color(team_name, home_team_name, away_team_name)
@@ -342,8 +349,8 @@ def plot_pass_map(
                 marker={"size": 5, "color": color, "opacity": 0.45},
                 customdata=subset[["player_name", "recipient_player_name", "minute", "second"]],
                 hovertemplate=(
-                    "<b>%{customdata[0]}</b> a %{customdata[1]}<br>"
-                    "Minuto %{customdata[2]}:%{customdata[3]:02d}<extra></extra>"
+                    f"<b>%{{customdata[0]}}</b> {t('a')} %{{customdata[1]}}<br>"
+                    f"{t('Minuto')} %{{customdata[2]}}:%{{customdata[3]:02d}}<extra></extra>"
                 ),
             )
         )
@@ -379,11 +386,13 @@ def plot_recoveries_losses(
         return annotate_empty(figure, "Sin recuperaciones o pérdidas con coordenadas")
 
     frame = pd.DataFrame(valid_rows)
-    frame["display_x"] = frame.apply(lambda row: _oriented_x(row["location_x"], row.get("team_name"), away_team_name), axis=1)
+    frame["display_x"] = frame.apply(
+        lambda row: _oriented_x(row["location_x"], row.get("team_name"), away_team_name), axis=1
+    )
     frame["display_y"] = pd.to_numeric(frame["location_y"], errors="coerce")
     config = {
-        "recuperación": {"symbol": "circle", "label": "Recuperaciones"},
-        "pérdida": {"symbol": "x", "label": "Pérdidas"},
+        "recuperación": {"symbol": "circle", "label": t("Recuperaciones")},
+        "pérdida": {"symbol": "x", "label": t("Pérdidas")},
     }
     for team_name in _ordered_teams(frame["team_name"].dropna().unique().tolist(), home_team_name, away_team_name):
         team_subset = frame[frame["team_name"] == team_name]
@@ -401,9 +410,9 @@ def plot_recoveries_losses(
                     customdata=subset[["team_name", "player_name", "type_name", "minute", "second"]],
                     hovertemplate=(
                         "<b>%{customdata[1]}</b><br>"
-                        "Equipo: %{customdata[0]}<br>"
-                        "Tipo: %{customdata[2]}<br>"
-                        "Minuto %{customdata[3]}:%{customdata[4]:02d}<extra></extra>"
+                        f"{t('Equipo')}: %{{customdata[0]}}<br>"
+                        f"{t('Tipo')}: %{{customdata[2]}}<br>"
+                        f"{t('Minuto')} %{{customdata[3]}}:%{{customdata[4]:02d}}<extra></extra>"
                     ),
                 ),
             )
@@ -419,7 +428,7 @@ def plot_momentum(
     rows = interval_rows or []
     figure = go.Figure()
     if not rows:
-        figure.update_layout(title="Momentum por intervalos", template="plotly_white")
+        figure.update_layout(title=t("Momentum por intervalos"), template="plotly_white")
         return annotate_empty(figure, "Sin datos para momentum")
 
     frame = pd.DataFrame(rows)
@@ -433,13 +442,13 @@ def plot_momentum(
                 name=_team_role_label(team_name, home_team_name, away_team_name),
                 line={"color": _team_color(team_name, home_team_name, away_team_name), "width": 2.5},
                 marker={"color": _team_color(team_name, home_team_name, away_team_name), "size": 7},
-                hovertemplate="Minuto %{x}<br>Momentum %{y:.1f}<extra></extra>",
+                hovertemplate=f"{t('Minuto')} %{{x}}<br>Momentum %{{y:.1f}}<extra></extra>",
             )
         )
     figure.update_layout(
-        title="Momentum por intervalos",
-        xaxis_title="Minuto inicial",
-        yaxis_title="Score de momentum",
+        title=t("Momentum por intervalos"),
+        xaxis_title=t("Minuto inicial"),
+        yaxis_title=t("Score de momentum"),
         template="plotly_white",
         hovermode="x unified",
     )
@@ -488,11 +497,7 @@ def plot_broadcast_momentum(
     if not timeline or timeline[-1] < end_minute:
         timeline.append(end_minute)
 
-    grouped = (
-        frame.groupby(["interval_start", "team_name"], dropna=False)["momentum_score"]
-        .sum()
-        .reset_index()
-    )
+    grouped = frame.groupby(["interval_start", "team_name"], dropna=False)["momentum_score"].sum().reset_index()
     home_scores = (
         grouped[grouped["team_name"].eq(home_key)]
         .set_index("interval_start")["momentum_score"]
@@ -523,10 +528,10 @@ def plot_broadcast_momentum(
             fillcolor="rgba(220, 38, 38, 0.82)",
             customdata=hover_rows,
             hovertemplate=(
-                "Minuto %{x}'<br>"
+                f"{t('Minuto')} %{{x}}'<br>"
                 f"{home_label}: %{{customdata[0]:.1f}}<br>"
                 f"{away_label}: %{{customdata[1]:.1f}}<br>"
-                "Diferencia: %{customdata[2]:+.1f}<extra></extra>"
+                f"{t('Diferencia')}: %{{customdata[2]:+.1f}}<extra></extra>"
             ),
         )
     )
@@ -541,10 +546,10 @@ def plot_broadcast_momentum(
             fillcolor="rgba(37, 99, 235, 0.78)",
             customdata=hover_rows,
             hovertemplate=(
-                "Minuto %{x}'<br>"
+                f"{t('Minuto')} %{{x}}'<br>"
                 f"{home_label}: %{{customdata[0]:.1f}}<br>"
                 f"{away_label}: %{{customdata[1]:.1f}}<br>"
-                "Diferencia: %{customdata[2]:+.1f}<extra></extra>"
+                f"{t('Diferencia')}: %{{customdata[2]:+.1f}}<extra></extra>"
             ),
         )
     )
@@ -572,7 +577,7 @@ def plot_broadcast_momentum(
     figure.add_annotation(
         x=-left_gutter * 0.54,
         y=y_limit * 0.45,
-        text=f"<b>LOCAL</b><br>{home_label}",
+        text=f"<b>{t('LOCAL')}</b><br>{home_label}",
         showarrow=False,
         align="center",
         font={"size": 11, "color": "#ffffff"},
@@ -583,7 +588,7 @@ def plot_broadcast_momentum(
     figure.add_annotation(
         x=-left_gutter * 0.54,
         y=-y_limit * 0.45,
-        text=f"<b>VISITA</b><br>{away_label}",
+        text=f"<b>{t('VISITA')}</b><br>{away_label}",
         showarrow=False,
         align="center",
         font={"size": 11, "color": "#ffffff"},
@@ -661,7 +666,7 @@ def _add_broadcast_shot_counts(
             mode="text",
             text=[str(value) for value in top_counts],
             textfont={"color": SHOT_COUNT_HOME_COLOR, "size": 12, "family": "Arial Black, Arial"},
-            name="Tiros a gol local",
+            name=f"{t('Tiros a gol')} {t('local')}",
             hoverinfo="skip",
             showlegend=False,
         )
@@ -673,7 +678,7 @@ def _add_broadcast_shot_counts(
             mode="text",
             text=[str(value) for value in bottom_counts],
             textfont={"color": SHOT_COUNT_AWAY_COLOR, "size": 12, "family": "Arial Black, Arial"},
-            name="Tiros a gol visitante",
+            name=f"{t('Tiros a gol')} {t('visitante')}",
             hoverinfo="skip",
             showlegend=False,
         )
@@ -717,10 +722,10 @@ def _add_broadcast_goal_markers(
                 customdata=subset[["player_name", "team_name", "minute", "second"]],
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
-                    "Equipo: %{customdata[1]}<br>"
-                    "Gol al %{customdata[2]}:%{customdata[3]:02d}<extra></extra>"
+                    f"{t('Equipo')}: %{{customdata[1]}}<br>"
+                    f"{t('Gol al')} %{{customdata[2]}}:%{{customdata[3]:02d}}<extra></extra>"
                 ),
-                name=f"Goles {_team_role_label(team_name, home_team_name, away_team_name)}",
+                name=f"{t('Goles')} {_team_role_label(team_name, home_team_name, away_team_name)}",
                 showlegend=False,
             )
         )
@@ -755,8 +760,7 @@ def _shots_on_target_counts(
     interval_starts: list[int],
 ) -> list[int]:
     subset = shot_frame[
-        shot_frame["team_name"].eq(str(team_name))
-        & shot_frame["shot_outcome_name"].isin(ON_TARGET_OUTCOMES)
+        shot_frame["team_name"].eq(str(team_name)) & shot_frame["shot_outcome_name"].isin(ON_TARGET_OUTCOMES)
     ].copy()
     if subset.empty:
         return [0 for _ in interval_starts]
@@ -788,9 +792,9 @@ def _team_color(team_name: Any, home_team_name: str | None, away_team_name: str 
 
 def _team_role_label(team_name: Any, home_team_name: str | None, away_team_name: str | None) -> str:
     if team_name == home_team_name:
-        return f"Local ({team_name})"
+        return f"{t('Local')} ({team_name})"
     if team_name == away_team_name:
-        return f"Visitante ({team_name})"
+        return f"{t('Visitante')} ({team_name})"
     return str(team_name)
 
 

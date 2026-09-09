@@ -14,8 +14,9 @@ def save_narrative(result: dict[str, Any]) -> tuple[str, str]:
     ANALYTICS_EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
     match_id = result["match_id"]
     tone = _safe_token(str(result["tone"]))
-    md_path = ANALYTICS_EXPORTS_DIR / f"narrative.match-{match_id}.{tone}.md"
-    json_path = ANALYTICS_EXPORTS_DIR / f"narrative.match-{match_id}.{tone}.json"
+    language = _safe_token(str(result.get("language") or "es"))
+    md_path = ANALYTICS_EXPORTS_DIR / f"narrative.match-{match_id}.{language}.{tone}.md"
+    json_path = ANALYTICS_EXPORTS_DIR / f"narrative.match-{match_id}.{language}.{tone}.json"
 
     md_path.write_text(str(result.get("narrative_markdown") or ""), encoding="utf-8")
     with json_path.open("w", encoding="utf-8") as file:

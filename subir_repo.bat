@@ -10,6 +10,12 @@ set "MODE=%~1"
 if /I "%MODE%"=="help" goto :help
 if /I "%MODE%"=="-h" goto :help
 if /I "%MODE%"=="/?" goto :help
+if /I "%MODE%"=="check" (
+    set "SAVE_DIFF=N"
+    set "DIFF_ONLY=N"
+    set "PREFLIGHT_ONLY=S"
+    goto :run
+)
 if /I "%MODE%"=="push" (
     set "SAVE_DIFF=N"
     set "DIFF_ONLY=N"
@@ -39,8 +45,8 @@ echo ==========================================
 echo Repo: %REPO_URL%
 echo.
 echo 1. Subir codigo
-echo 2. Guardar diff y subir codigo
-echo 3. Solo guardar diff
+echo 2. Guardar diff seguro y subir codigo
+echo 3. Solo guardar diff seguro
 echo 4. Salir
 echo.
 choice /C 1234 /N /M "Elige una opcion [1-4]: "
@@ -60,17 +66,37 @@ set "DIFF_ONLY=N"
 goto :run
 
 :run
-call :require_git || exit /b 1
-call :ensure_repo || exit /b 1
+call :require_git
+if errorlevel 1 exit /b 1
+call :ensure_repo
+if errorlevel 1 exit /b 1
 
 if /I "%DIFF_ONLY%"=="S" (
-    call :save_working_diff || exit /b 1
+    call :save_working_diff
+    if errorlevel 1 exit /b 1
     echo.
     echo Diff guardado. No se hizo commit ni push.
     exit /b 0
 )
 
-call :ensure_origin || exit /b 1
+call :ensure_origin
+if errorlevel 1 exit /b 1
+call :current_branch
+if errorlevel 1 exit /b 1
+call :refresh_origin
+if errorlevel 1 exit /b 1
+call :guard_unpushed_history
+if errorlevel 1 exit /b 1
+
+if /I "%PREFLIGHT_ONLY%"=="S" (
+    echo.
+    echo Preparando cambios para revision segura...
+    call :stage_safe_changes
+    if errorlevel 1 exit /b 1
+    echo.
+    echo Revision lista. Cambios seguros preparados. No se hizo commit ni push.
+    exit /b 0
+)
 
 echo.
 echo Estado actual:
@@ -83,15 +109,13 @@ if not defined COMMIT_MSG set "COMMIT_MSG=Actualiza NarradorFutbol"
 
 echo.
 echo Preparando cambios...
-git add -A
-if errorlevel 1 (
-    echo Error al preparar cambios con git add.
-    exit /b 1
-)
+call :stage_safe_changes
+if errorlevel 1 exit /b 1
 
 if /I "%SAVE_DIFF%"=="S" (
-    call :save_staged_diff || exit /b 1
-    call :unstage_diff_files
+    call :save_staged_diff
+    if errorlevel 1 exit /b 1
+    call :unstage_blocked_files
 )
 
 git diff --cached --quiet
@@ -108,8 +132,6 @@ if errorlevel 1 (
     echo.
     echo No hay cambios preparados para commit. Se intentara hacer push de la rama actual.
 )
-
-call :current_branch || exit /b 1
 
 echo.
 echo Subiendo rama !BRANCH! a origin...
@@ -170,6 +192,61 @@ git remote set-url origin "%REPO_URL%"
 if errorlevel 1 exit /b 1
 exit /b 0
 
+:refresh_origin
+echo.
+echo Actualizando referencia remota...
+git fetch origin --prune
+if errorlevel 1 (
+    echo No se pudo actualizar origin. Revisa conexion o credenciales antes de publicar.
+    exit /b 1
+)
+exit /b 0
+
+:guard_unpushed_history
+set "REMOTE_REF=origin/!BRANCH!"
+git rev-parse --verify "!REMOTE_REF!" >nul 2>nul
+if errorlevel 1 set "REMOTE_REF=origin/%DEFAULT_BRANCH%"
+git rev-parse --verify "!REMOTE_REF!" >nul 2>nul
+if errorlevel 1 (
+    echo No se encontro una referencia remota para comparar historia local.
+    exit /b 1
+)
+
+echo.
+echo Revisando historia local no subida contra !REMOTE_REF!...
+set "BLOCKED_HISTORY="
+for /f "delims=" %%F in ('git diff --name-only "!REMOTE_REF!..HEAD" -- "diff_*.txt" "*.patch" "*.key" "*.pem" "*.ppk" "*.p8" "*.p12" "*.pub" "id_rsa" "id_ed25519" "futbol" "futbol.pub" ".env" ".env.*" "*.db" "*.duckdb" "*.sqlite" "*.sqlite3" 2^>nul') do (
+    echo  - Archivo bloqueado en historia: %%F
+    set "BLOCKED_HISTORY=S"
+)
+if /I "!BLOCKED_HISTORY!"=="S" (
+    echo.
+    echo No se hara push: la historia local contiene archivos bloqueados.
+    echo Crea una rama limpia desde !REMOTE_REF! o reescribe la historia antes de publicar.
+    exit /b 1
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$limit=95MB; $bad=$false; git rev-list --objects '!REMOTE_REF!..HEAD' | ForEach-Object { $parts = $_ -split ' ', 2; if ($parts.Count -lt 2) { return }; $sizeText = git cat-file -s $parts[0] 2>$null; if ($LASTEXITCODE -ne 0) { return }; $size = [int64]$sizeText; if ($size -ge $limit) { Write-Output ('  - {0} ({1:N1} MB)' -f $parts[1], ($size/1MB)); $bad = $true } }; if ($bad) { exit 1 }"
+if errorlevel 1 (
+    echo.
+    echo No se hara push: hay blobs mayores o iguales a 95 MB en commits no subidos.
+    echo GitHub rechaza archivos grandes; limpia la historia antes de publicar.
+    exit /b 1
+)
+
+set "SECRET_HISTORY="
+for /f "delims=" %%F in ('git grep -I -l -E "^[[:space:]]*-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}" HEAD -- . 2^>nul') do (
+    echo  - Posible secreto rastreado: %%F
+    set "SECRET_HISTORY=S"
+)
+if /I "!SECRET_HISTORY!"=="S" (
+    echo.
+    echo No se hara push: se detecto material tipo PRIVATE KEY en archivos rastreados.
+    echo Mueve la llave fuera del repo y limpia la historia antes de publicar.
+    exit /b 1
+)
+exit /b 0
+
 :current_branch
 set "BRANCH="
 for /f "delims=" %%B in ('git branch --show-current 2^>nul') do set "BRANCH=%%B"
@@ -177,6 +254,63 @@ if defined BRANCH exit /b 0
 
 set "BRANCH=%DEFAULT_BRANCH%"
 git branch -M "%DEFAULT_BRANCH%" >nul 2>nul
+exit /b 0
+
+:stage_safe_changes
+git add -u -- .
+if errorlevel 1 (
+    echo Error al preparar cambios rastreados con git add.
+    exit /b 1
+)
+for /f "delims=" %%F in ('git ls-files --others --exclude-standard') do (
+    git add -- "%%F"
+    if errorlevel 1 (
+        echo Error al preparar archivo nuevo: %%F
+        exit /b 1
+    )
+)
+call :unstage_blocked_files
+call :guard_staged_blocked_files
+if errorlevel 1 exit /b 1
+call :guard_staged_large_files
+if errorlevel 1 exit /b 1
+call :guard_staged_secrets
+if errorlevel 1 exit /b 1
+exit /b 0
+
+:guard_staged_blocked_files
+set "BLOCKED_STAGED="
+for /f "delims=" %%F in ('git diff --cached --name-only -- "diff_*.txt" "*.patch" "*.key" "*.pem" "*.ppk" "*.p8" "*.p12" "*.pub" "id_rsa" "id_ed25519" "futbol" "futbol.pub" ".env" ".env.*" "*.db" "*.duckdb" "*.sqlite" "*.sqlite3" 2^>nul') do (
+    echo  - Archivo bloqueado preparado: %%F
+    set "BLOCKED_STAGED=S"
+)
+if /I "!BLOCKED_STAGED!"=="S" (
+    echo.
+    echo No se creara commit: hay archivos bloqueados preparados.
+    exit /b 1
+)
+exit /b 0
+
+:guard_staged_large_files
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$limit=95MB; $bad=$false; git diff --cached --name-only --diff-filter=AMR | ForEach-Object { if (Test-Path -LiteralPath $_) { $item = Get-Item -LiteralPath $_; if ($item.Length -ge $limit) { Write-Output ('  - {0} ({1:N1} MB)' -f $_, ($item.Length/1MB)); $bad = $true } } }; if ($bad) { exit 1 }"
+if errorlevel 1 (
+    echo.
+    echo No se creara commit: hay archivos preparados mayores o iguales a 95 MB.
+    exit /b 1
+)
+exit /b 0
+
+:guard_staged_secrets
+set "SECRET_STAGED="
+for /f "delims=" %%F in ('git grep --cached -I -l -E "^[[:space:]]*-{5}BEGIN [A-Z ]*PRIVATE KEY-{5}" -- . 2^>nul') do (
+    echo  - Posible secreto preparado: %%F
+    set "SECRET_STAGED=S"
+)
+if /I "!SECRET_STAGED!"=="S" (
+    echo.
+    echo No se creara commit: se detecto material tipo PRIVATE KEY en cambios preparados.
+    exit /b 1
+)
 exit /b 0
 
 :timestamp
@@ -197,11 +331,7 @@ echo Guardando diff en !DIFF_FILE!...
     echo ===== git status --short =====
     git status --short
     echo.
-    echo ===== git diff --binary =====
-    git diff --binary -- .
-    echo.
-    echo ===== git diff --cached --binary =====
-    git diff --cached --binary -- .
+    call :write_safe_working_diff
 ) > "!DIFF_FILE!"
 if errorlevel 1 (
     echo No se pudo guardar el diff.
@@ -222,8 +352,7 @@ echo Guardando diff preparado en !DIFF_FILE!...
     echo ===== git status --short =====
     git status --short
     echo.
-    echo ===== git diff --cached --binary =====
-    git diff --cached --binary -- .
+    call :write_safe_staged_diff
 ) > "!DIFF_FILE!"
 if errorlevel 1 (
     echo No se pudo guardar el diff preparado.
@@ -232,8 +361,138 @@ if errorlevel 1 (
 echo Diff guardado en !DIFF_FILE!
 exit /b 0
 
-:unstage_diff_files
-for %%F in (diff_*.txt) do (
+:write_safe_working_diff
+echo ===== git diff --stat =====
+git diff --stat -- . ^
+    ":(exclude)diff_*.txt" ^
+    ":(exclude)*.patch" ^
+    ":(exclude)*.key" ^
+    ":(exclude)*.pem" ^
+    ":(exclude)*.ppk" ^
+    ":(exclude)*.p8" ^
+    ":(exclude)*.p12" ^
+    ":(exclude)*.pub" ^
+    ":(exclude)id_rsa" ^
+    ":(exclude)id_ed25519" ^
+    ":(exclude)futbol" ^
+    ":(exclude)futbol.pub" ^
+    ":(exclude).env" ^
+    ":(exclude).env.*" ^
+    ":(exclude)*.db" ^
+    ":(exclude)*.duckdb" ^
+    ":(exclude)*.sqlite" ^
+    ":(exclude)*.sqlite3"
+echo.
+echo ===== git diff =====
+git diff -- . ^
+    ":(exclude)diff_*.txt" ^
+    ":(exclude)*.patch" ^
+    ":(exclude)*.key" ^
+    ":(exclude)*.pem" ^
+    ":(exclude)*.ppk" ^
+    ":(exclude)*.p8" ^
+    ":(exclude)*.p12" ^
+    ":(exclude)*.pub" ^
+    ":(exclude)id_rsa" ^
+    ":(exclude)id_ed25519" ^
+    ":(exclude)futbol" ^
+    ":(exclude)futbol.pub" ^
+    ":(exclude).env" ^
+    ":(exclude).env.*" ^
+    ":(exclude)*.db" ^
+    ":(exclude)*.duckdb" ^
+    ":(exclude)*.sqlite" ^
+    ":(exclude)*.sqlite3"
+echo.
+echo ===== git diff --cached --stat =====
+git diff --cached --stat -- . ^
+    ":(exclude)diff_*.txt" ^
+    ":(exclude)*.patch" ^
+    ":(exclude)*.key" ^
+    ":(exclude)*.pem" ^
+    ":(exclude)*.ppk" ^
+    ":(exclude)*.p8" ^
+    ":(exclude)*.p12" ^
+    ":(exclude)*.pub" ^
+    ":(exclude)id_rsa" ^
+    ":(exclude)id_ed25519" ^
+    ":(exclude)futbol" ^
+    ":(exclude)futbol.pub" ^
+    ":(exclude).env" ^
+    ":(exclude).env.*" ^
+    ":(exclude)*.db" ^
+    ":(exclude)*.duckdb" ^
+    ":(exclude)*.sqlite" ^
+    ":(exclude)*.sqlite3"
+echo.
+echo ===== git diff --cached =====
+git diff --cached -- . ^
+    ":(exclude)diff_*.txt" ^
+    ":(exclude)*.patch" ^
+    ":(exclude)*.key" ^
+    ":(exclude)*.pem" ^
+    ":(exclude)*.ppk" ^
+    ":(exclude)*.p8" ^
+    ":(exclude)*.p12" ^
+    ":(exclude)*.pub" ^
+    ":(exclude)id_rsa" ^
+    ":(exclude)id_ed25519" ^
+    ":(exclude)futbol" ^
+    ":(exclude)futbol.pub" ^
+    ":(exclude).env" ^
+    ":(exclude).env.*" ^
+    ":(exclude)*.db" ^
+    ":(exclude)*.duckdb" ^
+    ":(exclude)*.sqlite" ^
+    ":(exclude)*.sqlite3"
+exit /b 0
+
+:write_safe_staged_diff
+echo ===== git diff --cached --stat =====
+git diff --cached --stat -- . ^
+    ":(exclude)diff_*.txt" ^
+    ":(exclude)*.patch" ^
+    ":(exclude)*.key" ^
+    ":(exclude)*.pem" ^
+    ":(exclude)*.ppk" ^
+    ":(exclude)*.p8" ^
+    ":(exclude)*.p12" ^
+    ":(exclude)*.pub" ^
+    ":(exclude)id_rsa" ^
+    ":(exclude)id_ed25519" ^
+    ":(exclude)futbol" ^
+    ":(exclude)futbol.pub" ^
+    ":(exclude).env" ^
+    ":(exclude).env.*" ^
+    ":(exclude)*.db" ^
+    ":(exclude)*.duckdb" ^
+    ":(exclude)*.sqlite" ^
+    ":(exclude)*.sqlite3"
+echo.
+echo ===== git diff --cached =====
+git diff --cached -- . ^
+    ":(exclude)diff_*.txt" ^
+    ":(exclude)*.patch" ^
+    ":(exclude)*.key" ^
+    ":(exclude)*.pem" ^
+    ":(exclude)*.ppk" ^
+    ":(exclude)*.p8" ^
+    ":(exclude)*.p12" ^
+    ":(exclude)*.pub" ^
+    ":(exclude)id_rsa" ^
+    ":(exclude)id_ed25519" ^
+    ":(exclude)futbol" ^
+    ":(exclude)futbol.pub" ^
+    ":(exclude).env" ^
+    ":(exclude).env.*" ^
+    ":(exclude)*.db" ^
+    ":(exclude)*.duckdb" ^
+    ":(exclude)*.sqlite" ^
+    ":(exclude)*.sqlite3"
+exit /b 0
+
+:unstage_blocked_files
+for %%F in (diff_*.txt *.patch *.key *.pem *.ppk *.p8 *.p12 *.pub id_rsa id_ed25519 futbol futbol.pub .env .env.* *.db *.duckdb *.sqlite *.sqlite3) do (
     if exist "%%F" git reset -q -- "%%F" >nul 2>nul
 )
 exit /b 0
@@ -241,9 +500,10 @@ exit /b 0
 :help
 echo Uso:
 echo   subir_repo.bat            Muestra menu interactivo
+echo   subir_repo.bat check      Revisa y prepara cambios seguros sin commit ni push
 echo   subir_repo.bat push       Sube codigo sin guardar diff
-echo   subir_repo.bat diff       Guarda diff_fecha.txt y sube codigo
-echo   subir_repo.bat diff-only  Solo guarda diff_fecha.txt
+echo   subir_repo.bat diff       Guarda diff seguro y sube codigo
+echo   subir_repo.bat diff-only  Solo guarda diff seguro
 echo.
 echo Repo configurado:
 echo   %REPO_URL%

@@ -5,12 +5,62 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from src.ui.i18n import ai_language_name, is_english
 
-def build_scouting_prompt(context: dict[str, Any], mode: str = "comparativo") -> str:
+
+def build_scouting_prompt(context: dict[str, Any], mode: str = "comparativo", language: str = "es") -> str:
+    if is_english(language):
+        direct_section = "\n## Direct Comparison\nOnly if there are two players.\n" if mode == "comparativo" else ""
+        return f"""You are Scouting AI v1, a football analyst specialized in player evaluation.
+
+Write a scouting report in {ai_language_name(language)}, in Markdown, using only observed match data.
+
+Required structure:
+
+# Scouting Report
+
+## Executive Summary
+
+## Player Profile
+
+## Observed Strengths
+
+## Areas for Improvement or Caution
+
+## Suggested Tactical Role
+{direct_section}
+## Technical Staff Read
+
+## Conclusion
+
+Data rules:
+- Do not invent data outside the match.
+- Do not present future potential as fact.
+- Do not phrase transfer recommendations as objective conclusions from the data.
+- If roles differ, warn about it.
+- Separate volume, efficiency, and impact.
+- Base strengths and caution areas on metrics and radar.
+- If data does not exist, do not mention it.
+- Do not invent minutes played if they are unavailable.
+
+Professional language rules:
+- Use professional, clear, sober language.
+- Avoid offensive, vulgar, humiliating, sensationalist, or overly graphic language.
+- Avoid unnecessary violent metaphors.
+- Do not ridicule players, teams, or coaches.
+- Keep an analytical, respectful tone that is useful for professional scouting.
+- If describing low performance, frame it as areas for improvement or caution.
+- Do not make absolute claims about future, transfers, or market value.
+- Do not say a player must be signed unless the user explicitly asks; even then, express it carefully.
+
+JSON context:
+{json.dumps(context, ensure_ascii=False, indent=2)}
+"""
+
     direct_section = "\n## Comparación directa\nSolo si hay dos jugadores.\n" if mode == "comparativo" else ""
     return f"""Eres Scouting AI v1, un analista de fútbol especializado en evaluación de jugadores.
 
-Escribe un reporte de scouting en español de México, en Markdown, usando solo los datos observados del partido.
+Escribe un reporte de scouting en {ai_language_name(language)}, en Markdown, usando solo los datos observados del partido.
 
 Estructura obligatoria:
 
