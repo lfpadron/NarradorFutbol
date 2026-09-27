@@ -173,6 +173,7 @@ def render_scouting_markdown(result: dict[str, Any]) -> str:
             "",
             "## Traceability" if english else "## Trazabilidad",
             "",
+            f"- **{'Model' if english else 'Modelo'}:** {result.get('model') or ('N/A' if english else 'N/D')}",
             "- Source: StatsBomb Open Data." if english else "- Fuente: StatsBomb Open Data.",
             (
                 "- Context derived from the player comparator and the project's visual metrics."

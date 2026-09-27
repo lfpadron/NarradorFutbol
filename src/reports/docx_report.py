@@ -281,6 +281,7 @@ def _add_validation(document: Any, report: dict[str, Any]) -> None:
 
 def _add_traceability(document: Any, report: dict[str, Any]) -> None:
     english = is_english(report.get("language"))
+    model = report.get("narrative", {}).get("model") or ("N/A" if english else "N/D")
     document.add_heading("Traceability" if english else "Trazabilidad", level=1)
     items = (
         [
@@ -288,6 +289,7 @@ def _add_traceability(document: Any, report: dict[str, Any]) -> None:
             "Raw JSON preserved in data/raw/ without analytical modifications.",
             "Analytical DuckDB: data/analytics/statsbomb.duckdb.",
             "AI context curated from src/analytics/ai_context.py.",
+            f"Model: {model}.",
             f"Generated at: {report.get('generated_at')}.",
         ]
         if english
@@ -296,6 +298,7 @@ def _add_traceability(document: Any, report: dict[str, Any]) -> None:
             "Raw JSON preservado en data/raw/ sin modificaciones analíticas.",
             "DuckDB analítico: data/analytics/statsbomb.duckdb.",
             "Contexto AI curado desde src/analytics/ai_context.py.",
+            f"Modelo: {model}.",
             f"Fecha de generación: {report.get('generated_at')}.",
         ]
     )

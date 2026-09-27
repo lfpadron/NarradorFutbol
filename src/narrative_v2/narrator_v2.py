@@ -236,6 +236,7 @@ def render_specialized_narrative_markdown(result: dict[str, Any]) -> str:
         "",
         "## Traceability" if english else "## Trazabilidad",
         "",
+        f"- **{'Model' if english else 'Modelo'}:** {result.get('model') or ('N/A' if english else 'N/D')}",
         (
             "- Source: StatsBomb Open Data transformed into analytical DuckDB."
             if english

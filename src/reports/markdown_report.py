@@ -244,6 +244,7 @@ def _warnings_list(title: str, warnings: list[str], english: bool = False) -> st
 
 
 def _traceability(report: dict[str, Any], english: bool = False) -> str:
+    model = report.get("narrative", {}).get("model") or ("N/A" if english else "N/D")
     if english:
         return "\n".join(
             [
@@ -251,6 +252,7 @@ def _traceability(report: dict[str, Any], english: bool = False) -> str:
                 "- **Raw JSON:** preserved in `data/raw/` without analytical modifications.",
                 "- **Analytical DuckDB:** `data/analytics/statsbomb.duckdb`.",
                 "- **AI context:** built from `src/analytics/ai_context.py`, without sending all raw events to the narrator.",
+                f"- **Model:** {model}.",
                 f"- **Generated at:** {report.get('generated_at')}.",
             ]
         )
@@ -260,6 +262,7 @@ def _traceability(report: dict[str, Any], english: bool = False) -> str:
             "- **Raw JSON:** preservado en `data/raw/` sin modificaciones analíticas.",
             "- **DuckDB analítico:** `data/analytics/statsbomb.duckdb`.",
             "- **Contexto AI:** construido desde `src/analytics/ai_context.py`, sin pasar todos los eventos crudos al narrador.",
+            f"- **Modelo:** {model}.",
             f"- **Fecha de generación:** {report.get('generated_at')}.",
         ]
     )
