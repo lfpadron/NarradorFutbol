@@ -292,15 +292,28 @@ def match_brief_styles() -> str:
         text-align: right;
     }
     .match-brief-shirt {
-        display: inline-grid;
-        place-items: center;
+        display: inline-block;
+        position: relative;
         width: 2.2rem;
         height: 2.2rem;
-        border-radius: 8px;
-        background: #0f172a;
-        color: #ffffff;
-        font-size: 1.25rem;
         flex: 0 0 auto;
+    }
+    .match-brief-shirt::before {
+        content: "";
+        position: absolute;
+        inset: 0.2rem 0.08rem 0.08rem;
+        background: var(--shirt-color);
+        border: 2px solid var(--shirt-border);
+        clip-path: polygon(28% 0, 40% 10%, 60% 10%, 72% 0, 100% 20%, 85% 46%, 73% 38%, 73% 100%, 27% 100%, 27% 38%, 15% 46%, 0 20%);
+        filter: drop-shadow(0 2px 2px rgba(15, 23, 42, 0.2));
+    }
+    .match-brief-shirt.home {
+        --shirt-color: #dc2626;
+        --shirt-border: #991b1b;
+    }
+    .match-brief-shirt.away {
+        --shirt-color: #2563eb;
+        --shirt-border: #1e40af;
     }
     .match-brief-team-name {
         font-size: 1.05rem;
@@ -490,7 +503,7 @@ def render_match_scoreboard(summary: dict[str, object]) -> None:
         <div class="match-brief-shell">
             <div class="match-brief-scoreboard">
                 <div class="match-brief-team">
-                    <span class="match-brief-shirt">&#128085;</span>
+                    <span class="match-brief-shirt home" role="img" aria-label="{home_label}"></span>
                     <div>
                         <span class="match-brief-team-label">{home_label}</span>
                         <div class="match-brief-team-name">{home_name}</div>
@@ -505,7 +518,7 @@ def render_match_scoreboard(summary: dict[str, object]) -> None:
                         <span class="match-brief-team-label">{away_label}</span>
                         <div class="match-brief-team-name">{away_name}</div>
                     </div>
-                    <span class="match-brief-shirt">&#128085;</span>
+                    <span class="match-brief-shirt away" role="img" aria-label="{away_label}"></span>
                 </div>
             </div>
         </div>
