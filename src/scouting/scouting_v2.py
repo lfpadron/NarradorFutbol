@@ -5,7 +5,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from openai import OpenAI
+
 from src.ingestion.utils import to_jsonable
+from src.narrative.config import get_openai_api_key, get_openai_model, sampling_parameters
 from src.scouting.scouting_language_guard import sanitize_scouting_language, validate_scouting_language
 from src.scouting.tactical_profile import build_tactical_profile
 from src.ui.i18n import is_english, translate_text
@@ -17,6 +20,8 @@ def generate_scouting_v2(
     match_id_b: int | None = None,
     player_id_b: int | None = None,
     language: str = "es",
+    use_api: bool = False,
+    model: str | None = None,
 ) -> dict[str, Any]:
     has_player_b = match_id_b is not None and player_id_b is not None
     profile_a = build_tactical_profile(match_id_a, player_id_a)
@@ -24,6 +29,39 @@ def generate_scouting_v2(
     mode = "comparativo" if has_player_b else "individual"
     comparison = _compare_profiles(profile_a, profile_b, language=language) if profile_b else None
     narrative = _build_narrative(profile_a, profile_b, comparison, language=language)
+    model = model or get_openai_model()
+    reported_model = "local-tactical-profile-v2"
+    status = "generated"
+    generation_warnings: list[str] = []
+    if use_api:
+        status = "fallback"
+        api_key = get_openai_api_key()
+        if api_key:
+            try:
+                response = OpenAI(api_key=api_key).responses.create(
+                    model=model,
+                    input=_build_model_prompt(narrative, language=language),
+                    **sampling_parameters(model, temperature=0.35),
+                )
+                generated_narrative = (response.output_text or "").strip()
+                if not generated_narrative:
+                    raise ValueError("Empty model response" if is_english(language) else "Respuesta del modelo vacía")
+                narrative = generated_narrative
+                reported_model = model
+                status = "generated"
+            except Exception as exc:
+                message = (
+                    "OpenAI API failed; local tactical profile used. Detail"
+                    if is_english(language)
+                    else "OpenAI API falló; se usó el perfil táctico local. Detalle"
+                )
+                generation_warnings.append(f"{message}: {exc}")
+        else:
+            generation_warnings.append(
+                "OPENAI_API_KEY is not configured; local tactical profile used."
+                if is_english(language)
+                else "OPENAI_API_KEY no está configurada; se usó el perfil táctico local."
+            )
     language_warnings = validate_scouting_language(narrative)
     clean_narrative = sanitize_scouting_language(narrative)
     if clean_narrative != narrative:
@@ -37,6 +75,7 @@ def generate_scouting_v2(
     language_warnings.extend(warning for warning in residual_language_warnings if warning not in language_warnings)
 
     warnings = list(profile_a.get("warnings", []))
+    warnings.extend(generation_warnings)
     if profile_b:
         warnings.extend(profile_b.get("warnings", []))
         if (
@@ -65,8 +104,8 @@ def generate_scouting_v2(
         "match_id_b": match_id_b,
         "player_id_b": player_id_b,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "status": "generated",
-        "model": "local-tactical-profile-v2",
+        "status": status,
+        "model": reported_model,
         "profile_a": profile_a,
         "profile_b": profile_b,
         "comparison": comparison,
@@ -77,6 +116,28 @@ def generate_scouting_v2(
         "context_summary": _context_summary(profile_a, profile_b),
     }
     return to_jsonable(result)
+
+
+def _build_model_prompt(reference_narrative: str, language: str = "es") -> str:
+    """Use the existing tactical report as the same brief for every model."""
+    if is_english(language):
+        instructions = (
+            "You are Scouting AI v2. Write a professional scouting report in English, in Markdown, "
+            "using only the reference report below. Preserve its sections, analytical style, objectives, "
+            "player names, archetypes, scores, strengths, limitations, recommendations, and interpretation risks. "
+            "Do not recalculate profiles, invent facts, infer an official position, or project career, market, "
+            "or future fit as fact. Keep comparisons when present. Return only the report."
+        )
+    else:
+        instructions = (
+            "Eres Scouting AI v2. Redacta un reporte de scouting profesional en español, en Markdown, "
+            "usando solo el reporte de referencia siguiente. Conserva sus secciones, estilo analítico, objetivos, "
+            "nombres de jugadores, arquetipos, puntuaciones, fortalezas, limitaciones, recomendaciones y riesgos "
+            "de interpretación. No recalcules perfiles, inventes hechos, infieras una posición oficial ni "
+            "proyectes carrera, mercado o encaje futuro como hecho. Mantén las comparaciones cuando existan. "
+            "Devuelve únicamente el reporte."
+        )
+    return f"{instructions}\n\n{reference_narrative}"
 
 
 def _build_narrative(

@@ -14,7 +14,7 @@ from openai import OpenAI, OpenAIError
 from src.analytics.ai_context import build_ai_match_context
 from src.config import ANALYTICS_EXPORTS_DIR, project_relative
 from src.ingestion.utils import to_jsonable
-from src.narrative.config import get_openai_api_key, get_openai_model
+from src.narrative.config import get_openai_api_key, get_openai_model, sampling_parameters
 from src.narrative.fact_guard import validate_narrative_against_context
 from src.narrative_v2.prompt_builder_v2 import build_specialized_prompt
 from src.narrative_v2.section_builder import build_context_for_style
@@ -30,11 +30,12 @@ def generate_specialized_narrative(
     style_id: str,
     use_api: bool = True,
     language: str = "es",
+    model: str | None = None,
 ) -> dict[str, Any]:
     profile = get_style_profile(style_id)
     full_context = build_ai_match_context(match_id)
     context_used = build_context_for_style(full_context, style_id)
-    model = get_openai_model()
+    model = model or get_openai_model()
     warnings: list[str] = []
     status = "fallback"
 
@@ -46,7 +47,7 @@ def generate_specialized_narrative(
             response = client.responses.create(
                 model=model,
                 input=prompt,
-                temperature=0.35,
+                **sampling_parameters(model, temperature=0.35),
             )
             narrative_markdown = _extract_response_text(response).strip()
             status = "generated"
@@ -106,12 +107,14 @@ def generate_specialized_narrative(
     )
 
 
-def compare_specialized_styles(match_id: int, use_api: bool = False, language: str = "es") -> dict[str, Any]:
+def compare_specialized_styles(
+    match_id: int, use_api: bool = False, language: str = "es", model: str | None = None
+) -> dict[str, Any]:
     rows = []
     best_style = None
     best_score = -1
     for style_id, profile in STYLE_PROFILES.items():
-        result = generate_specialized_narrative(match_id, style_id, use_api=use_api, language=language)
+        result = generate_specialized_narrative(match_id, style_id, use_api=use_api, language=language, model=model)
         score = int(result.get("style_quality", {}).get("style_score") or 0)
         rows.append(
             {

@@ -12,10 +12,12 @@ from src.narrative.tone_comparison import compare_tones
 from src.ui.i18n import is_english
 
 
-def build_review_report(match_id: int, use_api: bool = False, language: str = "es") -> dict[str, Any]:
+def build_review_report(
+    match_id: int, use_api: bool = False, language: str = "es", model: str | None = None
+) -> dict[str, Any]:
     context = build_ai_match_context(match_id)
     summary = context.get("match_summary", {})
-    comparison = compare_tones(match_id, tones=None, use_api=use_api, language=language)
+    comparison = compare_tones(match_id, tones=None, use_api=use_api, language=language, model=model)
     recommendations = _build_recommendations(comparison, language=language)
     return to_jsonable(
         {

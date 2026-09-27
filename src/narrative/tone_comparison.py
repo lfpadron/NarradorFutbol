@@ -25,6 +25,7 @@ def compare_tones(
     tones: list[str] | None = None,
     use_api: bool = False,
     language: str = "es",
+    model: str | None = None,
 ) -> dict[str, Any]:
     selected_tones = tones or DEFAULT_COMPARISON_TONES
     for tone in selected_tones:
@@ -33,7 +34,7 @@ def compare_tones(
     context = build_ai_match_context(match_id)
     rows: list[dict[str, Any]] = []
     for tone in selected_tones:
-        result = generate_match_narrative(match_id, tone=tone, use_api=use_api, language=language)
+        result = generate_match_narrative(match_id, tone=tone, use_api=use_api, language=language, model=model)
         quality = evaluate_narrative_quality(result["narrative_markdown"], context)
         generation_warnings = list(result.get("warnings") or [])
         narrative_warnings = [warning for warning in generation_warnings if not _is_operational_warning(str(warning))]

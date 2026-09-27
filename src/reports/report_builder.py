@@ -17,9 +17,10 @@ def build_match_report(
     tone: str = "cronica_emocionante",
     use_api: bool = False,
     language: str = "es",
+    model: str | None = None,
 ) -> dict[str, Any]:
     context = build_ai_match_context(match_id)
-    narrative = generate_match_narrative(match_id, tone=tone, use_api=use_api, language=language)
+    narrative = generate_match_narrative(match_id, tone=tone, use_api=use_api, language=language, model=model)
     quality = evaluate_narrative_quality(narrative["narrative_markdown"], context)
     validation = context.get("validation", {})
     validation_warnings = [

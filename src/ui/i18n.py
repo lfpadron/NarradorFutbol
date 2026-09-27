@@ -274,6 +274,8 @@ _EN_TRANSLATIONS: dict[str, str] = {
     "Métricas rápidas": "Quick metrics",
     "Minuto inicial": "Start minute",
     "Modo": "Mode",
+    "Modelo": "Model",
+    "Modelo de IA": "AI model",
     "Momentum por intervalos": "Interval momentum",
     "Momentum score": "Momentum score",
     "Momento clave": "Key moment",

@@ -9,7 +9,7 @@ from openai import OpenAI, OpenAIError
 
 from src.analytics.ai_context import build_ai_match_context
 from src.ingestion.utils import to_jsonable
-from src.narrative.config import get_openai_api_key, get_openai_model, validate_tone
+from src.narrative.config import get_openai_api_key, get_openai_model, sampling_parameters, validate_tone
 from src.narrative.fact_guard import validate_narrative_against_context
 from src.narrative.prompt_builder import build_match_narrative_prompt
 from src.narrative.templates import generate_fallback_narrative
@@ -21,10 +21,11 @@ def generate_match_narrative(
     tone: str = "cronica_emocionante",
     use_api: bool = True,
     language: str = "es",
+    model: str | None = None,
 ) -> dict[str, Any]:
     tone = validate_tone(tone)
     context = build_ai_match_context(match_id)
-    model = get_openai_model()
+    model = model or get_openai_model()
     warnings: list[str] = []
     status = "fallback"
 
@@ -36,7 +37,7 @@ def generate_match_narrative(
             response = client.responses.create(
                 model=model,
                 input=prompt,
-                temperature=0.4,
+                **sampling_parameters(model, temperature=0.4),
             )
             narrative_markdown = _extract_response_text(response).strip()
             status = "generated"

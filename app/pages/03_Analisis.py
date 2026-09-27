@@ -71,6 +71,7 @@ from src.ui.charts import momentum_line, shots_on_target_bar, xg_bar, xg_differe
 from src.ui.downloads import render_download_button, render_export_downloads
 from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_pct, format_score
+from src.ui.model_selector import render_model_selector
 from src.ui.i18n import (
     current_language,
     is_english,
@@ -971,6 +972,7 @@ with tabs[5]:
 
 with tabs[6]:
     st.subheader("Narrador AI")
+    selected_model = render_model_selector("narrative_model")
     tone_label_to_value = {label: value for value, label in SUPPORTED_TONES.items()}
     selected_tone_label = st.selectbox("Tono", list(tone_label_to_value.keys()))
     selected_tone = tone_label_to_value[selected_tone_label]
@@ -980,14 +982,14 @@ with tabs[6]:
     if not api_key_available:
         st.warning("OPENAI_API_KEY no está configurada. Se generará narrativa local de respaldo.")
 
-    result_key = f"narrative_result_{language}_{match_id}_{selected_tone}"
-    quality_key = f"narrative_quality_{language}_{match_id}_{selected_tone}"
-    comparison_key = f"tone_comparison_{language}_{match_id}"
-    review_key = f"review_report_{language}_{match_id}"
-    narrative_paths_key = f"narrative_paths_{language}_{match_id}_{selected_tone}"
-    review_paths_key = f"review_paths_{language}_{match_id}"
-    final_report_key = f"final_report_{language}_{match_id}_{selected_tone}"
-    final_report_paths_key = f"final_report_paths_{language}_{match_id}_{selected_tone}"
+    result_key = f"narrative_result_{language}_{match_id}_{selected_tone}_{selected_model}"
+    quality_key = f"narrative_quality_{language}_{match_id}_{selected_tone}_{selected_model}"
+    comparison_key = f"tone_comparison_{language}_{match_id}_{selected_model}"
+    review_key = f"review_report_{language}_{match_id}_{selected_model}"
+    narrative_paths_key = f"narrative_paths_{language}_{match_id}_{selected_tone}_{selected_model}"
+    review_paths_key = f"review_paths_{language}_{match_id}_{selected_model}"
+    final_report_key = f"final_report_{language}_{match_id}_{selected_tone}_{selected_model}"
+    final_report_paths_key = f"final_report_paths_{language}_{match_id}_{selected_tone}_{selected_model}"
     action_cols = st.columns(2)
     if action_cols[0].button("Generar narración"):
         with st.spinner("Generando narración..."):
@@ -996,6 +998,7 @@ with tabs[6]:
                 selected_tone,
                 use_api=use_api,
                 language=language,
+                model=selected_model,
             )
             st.session_state.pop(narrative_paths_key, None)
 
@@ -1015,6 +1018,7 @@ with tabs[6]:
                     selected_tone,
                     use_api=use_api,
                     language=language,
+                    model=selected_model,
                 )
                 st.session_state[result_key] = current_result
             st.session_state[quality_key] = evaluate_narrative_quality(
@@ -1029,11 +1033,12 @@ with tabs[6]:
                 tones=None,
                 use_api=use_api,
                 language=language,
+                model=selected_model,
             )
 
     if review_cols[2].button("Guardar revisión"):
         with st.spinner("Construyendo revisión..."):
-            report = build_review_report(match_id, use_api=use_api, language=language)
+            report = build_review_report(match_id, use_api=use_api, language=language, model=selected_model)
             md_path, json_path = save_review_report(report)
             st.session_state[review_key] = report
             st.session_state[review_paths_key] = {"markdown": md_path, "json": json_path}
@@ -1164,7 +1169,9 @@ with tabs[6]:
     report_cols = st.columns(2)
     if report_cols[0].button("Generar reporte"):
         with st.spinner("Generando reporte final..."):
-            final_report = build_match_report(match_id, tone=selected_tone, use_api=use_api, language=language)
+            final_report = build_match_report(
+                match_id, tone=selected_tone, use_api=use_api, language=language, model=selected_model
+            )
             st.session_state[final_report_key] = {
                 "report": final_report,
                 "markdown": render_markdown_report(final_report),
@@ -1263,6 +1270,7 @@ with tabs[6]:
 with tabs[7]:
     st.subheader("Narrador AI v2")
     st.write("Narrativas especializadas por audiencia.")
+    selected_model_v2 = render_model_selector("narrative_v2_model")
 
     style_labels = {
         "Táctico": "tactico",
@@ -1286,9 +1294,9 @@ with tabs[7]:
 
     st.caption(f"Audiencia: {t(selected_profile['audience'])} | Objetivo: {t(selected_profile['objective'])}")
 
-    v2_result_key = f"narrative_v2_result_{language}_{match_id}_{selected_style_id}"
-    v2_comparison_key = f"narrative_v2_comparison_{language}_{match_id}"
-    v2_paths_key = f"narrative_v2_paths_{language}_{match_id}_{selected_style_id}"
+    v2_result_key = f"narrative_v2_result_{language}_{match_id}_{selected_style_id}_{selected_model_v2}"
+    v2_comparison_key = f"narrative_v2_comparison_{language}_{match_id}_{selected_model_v2}"
+    v2_paths_key = f"narrative_v2_paths_{language}_{match_id}_{selected_style_id}_{selected_model_v2}"
     v2_export_cols = st.columns(2)
     v2_include_pdf = v2_export_cols[0].checkbox(
         "Generar PDF",
@@ -1309,6 +1317,7 @@ with tabs[7]:
                 selected_style_id,
                 use_api=use_api_v2,
                 language=language,
+                model=selected_model_v2,
             )
             st.session_state.pop(v2_paths_key, None)
 
@@ -1318,6 +1327,7 @@ with tabs[7]:
                 match_id,
                 use_api=use_api_v2,
                 language=language,
+                model=selected_model_v2,
             )
 
     v2_result = st.session_state.get(v2_result_key)
@@ -1362,6 +1372,8 @@ with tabs[7]:
 
     if v2_result:
         st.markdown("### Resultado v2")
+        for warning in v2_result.get("warnings", []):
+            st.warning(warning)
         v2_quality = v2_result.get("style_quality", {})
         metric_cols = st.columns(5)
         metric_cols[0].metric("Status", v2_result.get("status"))
@@ -2231,6 +2243,7 @@ with tabs[10]:
 with tabs[11]:
     st.subheader("Scouting AI v2")
     st.write("Perfil táctico y arquetipos inferidos desde métricas observadas del partido.")
+    scouting_model_v2 = render_model_selector("scouting_v2_model")
 
     v2_match_labels = list(options.keys())
     v2_default_a_index = next((idx for idx, label in enumerate(v2_match_labels) if options[label] == 7534), 0)
@@ -2307,8 +2320,11 @@ with tabs[11]:
         v2_include_docx = export_v2_cols[1].checkbox("Generar DOCX", value=False, key="scouting_v2_docx")
         v2_include_pdf = export_v2_cols[2].checkbox("Generar PDF", value=False, key="scouting_v2_pdf")
 
-        v2_result_key = f"scouting_v2_result_{language}_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}"
-        v2_paths_key = f"scouting_v2_paths_{language}_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}"
+        scouting_v2_context_key = (
+            f"{language}_{v2_mode}_{v2_match_a}_{v2_player_a}_{v2_match_b}_{v2_player_b}_{scouting_model_v2}"
+        )
+        v2_result_key = f"scouting_v2_result_{scouting_v2_context_key}"
+        v2_paths_key = f"scouting_v2_paths_{scouting_v2_context_key}"
         v2_action_cols = st.columns(2)
         can_generate_v2 = v2_mode == "Individual" or (v2_match_b is not None and v2_player_b is not None)
         if v2_action_cols[0].button("Generar Scouting AI v2", disabled=not can_generate_v2):
@@ -2321,12 +2337,16 @@ with tabs[11]:
                             int(v2_match_b),
                             int(v2_player_b),
                             language=language,
+                            use_api=True,
+                            model=scouting_model_v2,
                         )
                     else:
                         st.session_state[v2_result_key] = generate_scouting_v2(
                             v2_match_a,
                             v2_player_a,
                             language=language,
+                            use_api=True,
+                            model=scouting_model_v2,
                         )
                     st.session_state.pop(v2_paths_key, None)
                 except Exception as exc:
