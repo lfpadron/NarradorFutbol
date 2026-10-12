@@ -8,6 +8,7 @@ RUN python -m venv .venv
 COPY pyproject.toml ./
 RUN .venv/bin/pip install .
 FROM python:3.11-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/.venv .venv/
 COPY . .

@@ -32,6 +32,7 @@ from src.ui.formatters import format_score
 from src.ui.i18n import current_language
 from src.ui.navigation import ensure_page_shell
 from src.ui.pitch_charts import plot_pass_network
+from src.ui.shot_chain_panel import render_shot_chain_panel
 
 ensure_page_shell("Gráficas avanzadas")
 require_login()
@@ -211,7 +212,11 @@ chart_tabs = st.tabs(
         "Momentum",
         "Zonas",
         "Datos",
-    ]
+        "Pases para tiro a gol",
+        "Animación de tiros",
+    ],
+    key="advanced_chart_tabs",
+    on_change="rerun",
 )
 
 with chart_tabs[0]:
@@ -377,5 +382,19 @@ with chart_tabs[7]:
         [],
         key=f"advanced_pdf_data_{match_id}_{selected_table}",
     )
+
+if chart_tabs[8].open:
+    with chart_tabs[8]:
+        try:
+            render_shot_chain_panel(match_id, home_team_name, away_team_name)
+        except AnalyticsDatabaseError as exc:
+            st.error(str(exc))
+
+if chart_tabs[9].open:
+    with chart_tabs[9]:
+        try:
+            render_shot_chain_panel(match_id, home_team_name, away_team_name, animated=True)
+        except AnalyticsDatabaseError as exc:
+            st.error(str(exc))
 
 render_footer()

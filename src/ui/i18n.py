@@ -276,6 +276,24 @@ _EN_TRANSLATIONS: dict[str, str] = {
     "Modo": "Mode",
     "Modelo": "Model",
     "Modelo de IA": "AI model",
+    "Pases para tiro a gol": "Passes leading to a shot",
+    "Animación de tiros": "Shot animation",
+    "Jugada: minuto – equipo – gol/tiro a gol": "Play: minute – team – goal/shot",
+    "No hay tiros con coordenadas disponibles para este partido.": "No shots with coordinates are available for this match.",
+    "Pases previos": "Previous passes",
+    "Participantes": "Participants",
+    "Rematador": "Shooter",
+    "Hasta tres pases de la misma cadena. Local rojo hacia la derecha; visitante azul hacia la izquierda.": (
+        "Up to three passes in the same sequence. Home in red attacking right; away in blue attacking left."
+    ),
+    "Reconstrucción por eventos con desplazamientos interpolados. El final del tiro es ilustrativo: salida del balón sin gol o rebote en la red con gol.": (
+        "Event reconstruction with interpolated movement. The shot ending is illustrative: "
+        "the ball exits for a non-goal or rebounds in the net for a goal."
+    ),
+    "Animando la jugada...": "Animating the play...",
+    "Exportar video (MP4)": "Export video (MP4)",
+    "Exportar PDF": "Export PDF",
+    "Detalle de la cadena": "Sequence details",
     "Momentum por intervalos": "Interval momentum",
     "Momentum score": "Momentum score",
     "Momento clave": "Key moment",

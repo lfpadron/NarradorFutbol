@@ -969,6 +969,9 @@ La app incluye:
 - página de partidos transformados con filtros básicos
 - página de análisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presión, posesión, momentum, análisis avanzado, Narrador AI con evaluación/comparación de tonos y reporte final, Narrador AI v2, Benchmark, Comparador de partidos, Comparador de jugadores, momentos clave y export JSON
 - página de gráficas avanzadas con calor de eventos/jugadores, tiros, pases, red de pases, recuperaciones/pérdidas, momentum y zonas de presencia
+- pestañas **Pases para tiro a gol** y **Animación de tiros**: selector cronológico de jugadas de ambos equipos, hasta tres pases conectados al remate, nombres y desplazamientos registrados, local rojo hacia la derecha y visitante azul hacia la izquierda; descarga del gráfico en PDF y de la animación en MP4
+
+La animación de tiros requiere **FFmpeg** disponible en el `PATH` del servidor de Streamlit (incluido en las imágenes Docker/Podman del proyecto). En Windows puede instalarse con `winget install Gyan.FFmpeg`; en Debian/Ubuntu, con `apt-get install ffmpeg`. El video H.264 se genera al abrir la pestaña de animación y se reutiliza desde la caché. Las posiciones intermedias se interpolan entre eventos; la salida o el rebote final del balón son ilustrativos, no seguimiento óptico. Los tiros sin coordenadas no se ofrecen en el selector. Los filtros de equipo/jugador de las otras gráficas no recortan estas cadenas.
 
 Visualizaciones futbolísticas disponibles:
 
