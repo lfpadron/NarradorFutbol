@@ -53,7 +53,7 @@ def render_footer() -> None:
                 margin-top: 48px;
                 padding: 18px 0 8px;
                 border-top: 1px solid rgba(148, 163, 184, 0.35);
-                color: #475569;
+                color: inherit;
             }}
             .astrogato-footer__text {{
                 display: flex;
@@ -70,6 +70,17 @@ def render_footer() -> None:
                 justify-content: center;
                 align-items: center;
             }}
+            .astrogato-footer__contact {{
+                text-align: right;
+                font-size: 0.85rem;
+                line-height: 1.6;
+            }}
+            .astrogato-footer__contact a {{
+                color: inherit;
+                text-decoration: none;
+                overflow-wrap: anywhere;
+            }}
+            .astrogato-footer__contact a:hover {{ text-decoration: underline; }}
             .astrogato-footer__link {{
                 display: inline-flex;
                 align-items: center;
@@ -95,6 +106,7 @@ def render_footer() -> None:
                     justify-content: center;
                     font-size: 0.7rem;
                 }}
+                .astrogato-footer__contact {{ width: 100%; text-align: right; }}
                 .astrogato-footer__logo,
                 .astrogato-footer__logo-placeholder {{
                     width: min(280px, 82vw);
@@ -105,7 +117,10 @@ def render_footer() -> None:
         <footer class="astrogato-footer">
             <div class="astrogato-footer__text">{FOOTER_TEXT}</div>
             <div class="astrogato-footer__brand">{logo}</div>
-            <div aria-hidden="true"></div>
+            <div class="astrogato-footer__contact">
+                <div>Para más información</div>
+                <a href="mailto:lfpadron@astrogatolabs.com"><span aria-hidden="true">✉</span> lfpadron@astrogatolabs.com</a>
+            </div>
         </footer>
         """,
         unsafe_allow_html=True,

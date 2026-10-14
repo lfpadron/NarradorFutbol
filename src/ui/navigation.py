@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
+from src.security.models import can_access_page
 from src.ui.i18n import DEFAULT_LANGUAGE, current_language, install_streamlit_i18n, render_language_selector, t
 from src.ui.page_config import soccer_page_icon
 
@@ -14,20 +15,28 @@ APP_ROOT = PROJECT_ROOT / "app"
 
 PAGE_DEFINITIONS = [
     {
-        "path": "pages/00_Inicio.py",
-        "fallback_path": APP_ROOT / "pages" / "00_Inicio.py",
-        "label": "Inicio",
-        "icon": ":material/home:",
-        "default": True,
-        "url_path": "Inicio",
-    },
-    {
         "path": "pages/00_Login.py",
         "fallback_path": APP_ROOT / "pages" / "00_Login.py",
         "label": "Iniciar sesión",
         "icon": ":material/login:",
-        "default": False,
+        "default": True,
         "url_path": "Login",
+    },
+    {
+        "path": "pages/05_Mi_Usuario.py",
+        "fallback_path": APP_ROOT / "pages" / "05_Mi_Usuario.py",
+        "label": "Mi usuario",
+        "icon": ":material/account_circle:",
+        "default": False,
+        "url_path": "Mi_Usuario",
+    },
+    {
+        "path": "pages/06_Usuarios.py",
+        "fallback_path": APP_ROOT / "pages" / "06_Usuarios.py",
+        "label": "Usuarios",
+        "icon": ":material/group:",
+        "default": False,
+        "url_path": "Usuarios",
     },
     {
         "path": "pages/01_Ingesta.py",
@@ -64,11 +73,20 @@ PAGE_DEFINITIONS = [
 ]
 
 
-def build_streamlit_pages(language: str) -> list[Any]:
+def visible_page_definitions(user: dict | None = None) -> list[dict[str, Any]]:
+    return [
+        definition
+        for definition in PAGE_DEFINITIONS
+        if definition["label"] == "Iniciar sesión"
+        or (user and user.get("is_active") and can_access_page(user["role"], str(definition["label"])))
+    ]
+
+
+def build_streamlit_pages(language: str, user: dict | None = None) -> list[Any]:
     import streamlit as st
 
     pages = []
-    for definition in PAGE_DEFINITIONS:
+    for definition in visible_page_definitions(user):
         page_kwargs = {
             "title": str(t(definition["label"], language=language)),
             "icon": definition["icon"],
@@ -80,12 +98,16 @@ def build_streamlit_pages(language: str) -> list[Any]:
     return pages
 
 
-def render_sidebar_navigation(language: str, pages: list[Any] | None = None) -> None:
+def render_sidebar_navigation(language: str, pages: list[Any] | None = None, user: dict | None = None) -> None:
     import streamlit as st
 
     query_params = {"lang": language} if language != DEFAULT_LANGUAGE else None
     with st.sidebar:
-        for index, definition in enumerate(PAGE_DEFINITIONS):
+        st.markdown("**Narrador de Fútbol**")
+        st.caption("Astrogato Labs")
+        for index, definition in enumerate(visible_page_definitions(user)):
+            if user and definition["label"] == "Iniciar sesión":
+                continue
             label = str(t(definition["label"], language=language))
             target = pages[index] if pages else definition["fallback_path"]
             if st.button(
@@ -99,7 +121,7 @@ def render_sidebar_navigation(language: str, pages: list[Any] | None = None) -> 
         st.divider()
 
 
-def ensure_page_shell(page_title: str, layout: str = "wide") -> None:
+def ensure_page_shell(page_title: str, layout: Literal["wide", "centered"] = "wide") -> None:
     import streamlit as st
 
     if st.session_state.get(NAVIGATION_SHELL_SESSION_KEY):
@@ -112,5 +134,9 @@ def ensure_page_shell(page_title: str, layout: str = "wide") -> None:
         layout=layout,
     )
     render_language_selector()
-    render_sidebar_navigation(language)
+    from src.security.storage import initialize_security
+    from src.security.streamlit_auth import current_user
+
+    initialize_security()
+    render_sidebar_navigation(language, user=current_user())
     install_streamlit_i18n()

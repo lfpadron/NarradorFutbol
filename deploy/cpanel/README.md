@@ -43,7 +43,12 @@ Edita `deploy/cpanel/analista-futbol.env`:
 - `SEED_ADMIN_EMAIL_1=<tu correo admin>`
 - `SEED_ADMIN_PASSWORD=<password temporal largo>`
 - `OPENAI_API_KEY=<opcional>`
-- variables SMTP, si quieres que la app mande invitaciones por correo.
+- `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` para el acceso de invitados.
+
+En Supabase habilita Email y el registro de usuarios, configura SMTP propio,
+códigos de 6 dígitos y caducidad de 3600 segundos. Usa la plantilla
+`deploy/supabase/guest_otp_email.html` en **Magic Link** y **Confirm signup**.
+El README principal contiene la configuración completa y las pruebas previas al evento.
 
 No subas `analista-futbol.env` al repo.
 

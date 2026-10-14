@@ -51,8 +51,10 @@ def public_user(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": int(row["id"]),
         "email": str(row["email"]),
+        "name": str(row.get("name") or ""),
         "role": str(row["role"]),
         "is_active": bool(row["is_active"]),
+        "session_version": int(row.get("session_version", 0)),
     }
 
 

@@ -24,6 +24,7 @@ RUN uv sync --frozen --no-dev
 
 COPY src ./src
 COPY app ./app
+COPY .streamlit ./.streamlit
 
 RUN mkdir -p /app/data /app/data/raw /app/data/reports /app/data/scouting /app/data/analytics /app/data/security /app/input /app/output
 

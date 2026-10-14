@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
+
 import sys
 from pathlib import Path
 
@@ -24,7 +26,7 @@ from src.ui.i18n import is_english
 from src.ui.navigation import ensure_page_shell
 
 ensure_page_shell("Ingesta")
-require_login()
+require_login("Ingesta")
 st.title("Ingesta")
 
 SINGLE_MATCH_INPUT_KEY = "single_match_download_id"

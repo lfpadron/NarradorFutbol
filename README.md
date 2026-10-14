@@ -21,7 +21,7 @@ El proyecto ya cubre las primeras capas del sistema:
 - Scouting AI v1.1 con fallback local, lenguaje profesional y export profesional
 - Scouting AI v2 con perfil táctico, arquetipos y comparación avanzada
 - gráficas avanzadas de partido en Streamlit
-- autenticación básica por invitación
+- acceso con contraseña para administradores/analistas y token de correo para invitados
 - despliegue en contenedor compatible con Docker/Podman
 
 La app conserva los datos raw sin modificaciones y genera los entregables derivados en `data/`.
@@ -963,8 +963,9 @@ uv run streamlit run app/streamlit_app.py
 
 La app incluye:
 
-- página Login con autenticación básica, admins semilla e invitaciones
-- página principal con estado de `data/analytics/statsbomb.duckdb`
+- inicio en Login con acceso de equipo e invitados
+- página Mi usuario para editar el nombre
+- página Usuarios para administración, búsqueda, roles y estado de las cuentas
 - página de ingesta con resumen de `ingestion_log.duckdb`
 - página de partidos transformados con filtros básicos
 - página de análisis con tabs, resumen, stats por equipo, top jugadores, tiros, pases, presión, posesión, momentum, análisis avanzado, Narrador AI con evaluación/comparación de tonos y reporte final, Narrador AI v2, Benchmark, Comparador de partidos, Comparador de jugadores, momentos clave y export JSON
@@ -1002,26 +1003,95 @@ Ejecutar Streamlit:
 uv run streamlit run app/streamlit_app.py
 ```
 
-## Seguridad v01
+## Acceso y administración de usuarios
 
-La v01 incluye autenticación básica para Streamlit:
+La raíz de la app abre **Iniciar sesión**. El acceso correcto lleva a **Mi usuario**,
+donde el nombre es opcional y editable; correo y rol son de solo lectura.
 
-- usuarios en `data/security/security.sqlite`
-- contraseñas con hash PBKDF2, nunca texto plano
-- roles `admin` y `analyst`
-- admins semilla desde `SEED_ADMIN_EMAIL_1` y `SEED_ADMIN_EMAIL_2`
-- contraseña inicial desde `SEED_ADMIN_PASSWORD`
-- invitaciones con token y expiración
+| Rol | Acceso |
+| --- | --- |
+| Administrador | Todas las pantallas, incluida Usuarios |
+| Analista | Todas excepto Usuarios |
+| Invitado | Todas excepto Usuarios e Ingesta |
 
-Flujo de invitación:
+Administradores y analistas entran con correo y contraseña; la cuenta debe existir
+y estar activa. Los invitados verifican su correo con un token de 6 dígitos de
+Supabase. Su cuenta local se crea automáticamente al completar la verificación,
+con rol invitado, activa y sin contraseña. Una cuenta desactivada no se reactiva al
+pedir un token; las cuentas de equipo siempre utilizan contraseña.
 
-1. Entrar con un admin semilla en la página **Login**.
-2. Capturar email y rol del usuario.
-3. Enviar enlace y token por SMTP si está configurado, o copiarlos desde la pantalla.
-4. El usuario abre **Login**, pega el token y crea su contraseña.
-5. El usuario `analyst` puede usar análisis, gráficas y reportes.
+**Usuarios**, exclusiva para administradores, incluye autocompletado por correo o
+nombre, filtro por rol, botones Filtrar/Limpiar y páginas de 20 registros. Selecciona
+un usuario de la página para capturar su primera contraseña o reemplazarla, cambiar
+su rol o activar/desactivar su cuenta. Crear usuario exige correo, nombre,
+contraseña (mínimo 10 caracteres), rol y estado. El máximo de tres administradores
+activos se valida al crear, promover o activar, incluso con operaciones simultáneas.
+Para convertir un invitado en analista/administrador, captura su contraseña y cambia
+su rol. Los cambios de contraseña, rol y estado invalidan sus sesiones anteriores
+cuando vuelven a interactuar con la aplicación.
 
-Solo `admin` puede invitar, ver usuarios y activar/desactivar cuentas. Si SMTP no está configurado o falla, la app no bloquea el flujo: muestra el enlace/token en pantalla para desarrollo local.
+Los usuarios, nombres, permisos y hashes PBKDF2 permanecen en
+`data/security/security.sqlite`. La actualización migra la tabla anterior
+conservando IDs, contraseñas, roles y estados. Conserva una copia de ese archivo
+antes del despliegue y monta `data/` en almacenamiento persistente. El diseño usa
+una instancia Streamlit con su volumen local; no reparte cuentas entre réplicas.
+Supabase verifica el correo de los invitados; no almacena los roles de la app ni
+requiere crear tablas o políticas RLS para este flujo.
+
+Los administradores iniciales se crean únicamente si están configurados
+`SEED_ADMIN_EMAIL_1`/`SEED_ADMIN_EMAIL_2` y `SEED_ADMIN_PASSWORD`. Una inicialización
+posterior no cambia cuentas existentes ni restaura su rol/estado. Conserva el mismo
+`APP_SECRET_KEY` al actualizar: forma parte del hash de las contraseñas existentes.
+
+### Acceso de invitados con Supabase
+
+Parámetros que necesita la aplicación (en `.env` o variables del despliegue):
+
+```dotenv
+SUPABASE_URL=https://TU-PROYECTO.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+También se acepta la clave pública heredada en `SUPABASE_ANON_KEY` en lugar de
+`SUPABASE_PUBLISHABLE_KEY`. No se necesita `service_role`, una clave secreta, la
+contraseña de PostgreSQL ni un token personal de administración.
+
+Configuración del proyecto Supabase:
+
+1. En Authentication, habilita el proveedor Email y permite el registro de nuevos
+   usuarios. Mantén la confirmación de correo activada.
+2. Configura **Email OTP length = 6** y **Email OTP expiration = 3600 segundos**.
+   La app también rechaza códigos una vez transcurrida una hora desde su solicitud.
+3. En las plantillas **Magic Link** y **Confirm signup**, copia
+   [`deploy/supabase/guest_otp_email.html`](deploy/supabase/guest_otp_email.html).
+   La variable `{{ .Token }}` muestra el código. Asunto sugerido: “Tu token de acceso
+   al Narrador de Fútbol”.
+4. Configura SMTP propio dentro de Supabase: servidor, puerto, usuario, contraseña,
+   correo remitente y nombre remitente. Verifica el dominio con tu proveedor de correo.
+   El servicio predeterminado solo envía a miembros autorizados del proyecto y no
+   sirve para recibir a los asistentes del evento.
+5. Revisa los límites de envío y verificación de Supabase y los de tu proveedor según
+   la asistencia esperada. Las llamadas salen desde la IP del servidor Streamlit,
+   por lo que los asistentes comparten sus límites por IP. La app limita reenvíos a
+   uno por minuto por correo y a cinco intentos por código, almacenados en SQLite.
+6. Establece Site URL con la URL pública de la app. El flujo captura el código en
+   pantalla y no requiere un callback o enlace de redirección.
+
+El formulario actual no incorpora CAPTCHA. Si lo habilitas en Supabase Auth,
+será necesario conectar ese desafío antes de usar este flujo.
+
+Sin los parámetros de Supabase, el acceso de equipo sigue funcionando y la sección
+de invitados indica que falta configuración. Los tokens no se muestran en pantalla,
+no se guardan localmente y las sesiones del proveedor no se comparten entre asistentes.
+
+Antes del evento, prueba con un correo externo nuevo y otro ya registrado: enviar
+el código, entrar, guardar el nombre, cerrar sesión y volver a entrar. Prueba también
+una cuenta inactiva y el acceso permitido de cada rol. Las pruebas automáticas usan
+respuestas simuladas de Supabase; el envío real requiere configurar el proyecto.
+
+Referencias oficiales: [acceso por OTP](https://supabase.com/docs/guides/auth/auth-email-passwordless),
+[SMTP](https://supabase.com/docs/guides/auth/auth-smtp) y
+[límites](https://supabase.com/docs/guides/auth/rate-limits).
 
 ## TUI de control
 
@@ -1070,8 +1140,8 @@ uv run mypy
 
 ## Límites conocidos v01
 
-- La autenticación es básica y local; no incluye OAuth, SSO ni recuperación automática de contraseña.
-- SMTP es opcional; soporta TLS o SSL por variables de entorno y, sin servidor configurado, v01 muestra invitaciones en pantalla.
+- Las cuentas de equipo son locales; no incluyen OAuth, SSO ni recuperación automática de contraseña.
+- El acceso de invitados necesita Supabase Auth y SMTP propio configurado en ese proyecto.
 - Los arquetipos de scouting se infieren desde un partido; deben validarse con más muestra y video.
 - Los PDFs usan fallback ReportLab cuando WeasyPrint no puede cargar librerías nativas.
 - El despliegue en contenedor monta datos en volumen local; no incluye orquestación multiusuario avanzada.

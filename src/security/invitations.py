@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from src.security.auth import get_app_secret
-from src.security.models import ROLE_ANALYST, VALID_ROLES
+from src.security.models import ROLE_ADMIN, ROLE_ANALYST
 from src.security.storage import (
     create_user_from_invitation,
     get_connection,
@@ -26,7 +26,7 @@ def create_invitation(
     ttl_hours: int | None = None,
     db_path: Path | None = None,
 ) -> dict[str, Any]:
-    if role not in VALID_ROLES:
+    if role not in {ROLE_ADMIN, ROLE_ANALYST}:
         raise ValueError(f"Rol inválido: {role}")
     clean_email = normalize_email(email)
     token = secrets.token_urlsafe(32)
