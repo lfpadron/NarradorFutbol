@@ -13,6 +13,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from dotenv import dotenv_values
+
+from src.config import PROJECT_ROOT
 from src.security.models import ROLE_GUEST
 from src.security.storage import (
     get_connection,
@@ -25,6 +28,7 @@ from src.security.storage import (
 OTP_TTL_SECONDS = 3600
 OTP_RESEND_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
+SUPABASE_ENV_PATH = PROJECT_ROOT / ".env"
 
 
 class GuestAccessError(ValueError):
@@ -32,8 +36,14 @@ class GuestAccessError(ValueError):
 
 
 def _config() -> tuple[str, str]:
-    url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    url = os.getenv("SUPABASE_URL", "").strip()
     key = (os.getenv("SUPABASE_PUBLISHABLE_KEY", "") or os.getenv("SUPABASE_ANON_KEY", "")).strip()
+    if not url or not key:
+        # Pick up parameters added after Streamlit started, without overwriting runtime settings.
+        local = dotenv_values(SUPABASE_ENV_PATH)
+        url = url or (local.get("SUPABASE_URL") or "").strip()
+        key = key or (local.get("SUPABASE_PUBLISHABLE_KEY") or local.get("SUPABASE_ANON_KEY") or "").strip()
+    url = url.rstrip("/")
     parsed = urlparse(url)
     if not key or parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.query or parsed.fragment:
         raise GuestAccessError("El acceso de invitados aún no está configurado. Contacta al organizador.")

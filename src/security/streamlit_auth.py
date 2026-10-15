@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import streamlit as st
 
-from src.security.guest_otp import is_configured, send_guest_token, verify_guest_token
-from src.security.models import ROLE_LABELS, can_access_page
-from src.security.storage import authenticate_user, initialize_security, update_own_name, validate_session
+from src.security.guest_otp import send_guest_token, verify_guest_token
+from src.security.models import ROLE_GUEST, ROLE_LABELS, can_access_page
+from src.security.storage import (
+    authenticate_user,
+    change_own_password,
+    initialize_security,
+    update_own_name,
+    validate_session,
+)
 from src.ui.footer import render_footer
 from src.ui.i18n import t
 
@@ -80,15 +86,12 @@ def render_login_page() -> None:
     with guest, st.container(border=True):
         st.subheader("Invitados")
         st.caption("Entra con tu correo. No necesitas invitación ni contraseña.")
-        configured = is_configured()
-        if not configured:
-            st.info("El acceso de invitados estará disponible en cuanto el organizador termine de configurarlo.")
         with st.form("guest_login_form", border=False, enter_to_submit=False):
             guest_email = st.text_input("Correo", key="guest_email", placeholder="tu@correo.com", max_chars=254)
-            send = st.form_submit_button("Enviar token", disabled=not configured, width="stretch")
+            send = st.form_submit_button("Enviar token", width="stretch")
             token = st.text_input("Token de 6 dígitos", max_chars=6, placeholder="000000", key="guest_token")
             st.caption("El token caduca en 1 hora y solo se puede utilizar una vez.")
-            enter = st.form_submit_button("Entrar", type="primary", disabled=not configured, width="stretch")
+            enter = st.form_submit_button("Entrar", type="primary", width="stretch")
         if send:
             try:
                 with st.spinner("Enviando token..."):
@@ -120,6 +123,37 @@ def render_profile_page() -> None:
             st.success("Tu nombre se ha actualizado.")
         except ValueError as exc:
             st.error(str(exc))
+
+    is_guest = user["role"] == ROLE_GUEST
+    with st.container(border=True):
+        st.subheader("Actualizar contraseña")
+        if is_guest:
+            st.caption("Los invitados acceden con un token de correo y no utilizan contraseña.")
+        else:
+            st.caption("Confirma tu contraseña actual y elige una nueva de al menos 10 caracteres.")
+        with st.form("change_password_form", border=False, clear_on_submit=True):
+            current_password = st.text_input(
+                "Contraseña actual", type="password", key="profile_current_password", max_chars=1024, disabled=is_guest
+            )
+            new_password = st.text_input(
+                "Contraseña nueva", type="password", key="profile_new_password", max_chars=1024, disabled=is_guest
+            )
+            confirmation = st.text_input(
+                "Confirmar contraseña nueva",
+                type="password",
+                key="profile_confirm_password",
+                max_chars=1024,
+                disabled=is_guest,
+            )
+            change_password = st.form_submit_button("Actualizar contraseña", type="primary", disabled=is_guest)
+        if change_password:
+            try:
+                if new_password != confirmation:
+                    raise ValueError("Las contraseñas no coinciden.")
+                st.session_state[SESSION_USER_KEY] = change_own_password(current_password, new_password, actor=user)
+                st.success("Tu contraseña se ha actualizado.")
+            except ValueError as exc:
+                st.error(str(exc))
 
 
 def _render_sidebar_user(user: dict) -> None:

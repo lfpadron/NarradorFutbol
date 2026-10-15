@@ -276,6 +276,25 @@ def set_user_password(email: str, password: str, *, actor: dict, db_path: Path |
         )
 
 
+def change_own_password(
+    current_password: str, new_password: str, *, actor: dict, db_path: Path | None = None
+) -> dict[str, Any]:
+    """Reauthenticate staff and revoke previous sessions while returning a renewed one."""
+    with get_connection(db_path) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        row = _require_actor(connection, actor)
+        if row["role"] not in {ROLE_ADMIN, ROLE_ANALYST}:
+            raise ValueError("Los invitados no pueden actualizar su contraseña.")
+        if not verify_password(current_password, row["password_hash"]):
+            raise ValueError("La contraseña actual es incorrecta.")
+        validate_password(new_password)
+        connection.execute(
+            "UPDATE users SET password_hash = ?, session_version = session_version + 1, updated_at = ? WHERE id = ?",
+            (hash_password(new_password), _now(), row["id"]),
+        )
+        return public_user(dict(_require_user(connection, row["email"])))
+
+
 def update_own_name(name: str, *, actor: dict, db_path: Path | None = None) -> dict[str, Any]:
     name = validate_name(name)
     with get_connection(db_path) as connection:

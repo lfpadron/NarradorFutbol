@@ -16,6 +16,7 @@ from src.security.models import ROLE_ADMIN, ROLE_ANALYST, ROLE_GUEST
 @pytest.fixture
 def otp(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "SECURITY_DB_PATH", tmp_path / "otp.sqlite")
+    monkeypatch.setattr(guest_otp, "SUPABASE_ENV_PATH", tmp_path / ".env")
     monkeypatch.setenv("SEED_ADMIN_PASSWORD", "")
     monkeypatch.setenv("SUPABASE_URL", "https://project.supabase.co")
     monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test")
@@ -199,6 +200,43 @@ def test_missing_configuration_does_not_create_accounts_or_requests(otp, monkeyp
     assert not guest_otp.is_configured()
     with pytest.raises(GuestAccessError, match="configurado"):
         send_guest_token("guest@example.com")
+    assert storage.user_count() == 0
+
+
+def test_supabase_configuration_added_after_startup_is_read_on_next_request(otp, monkeypatch):
+    for key in ("SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_ANON_KEY"):
+        monkeypatch.setenv(key, "")
+    assert not guest_otp.is_configured()
+    guest_otp.SUPABASE_ENV_PATH.write_text(
+        "SUPABASE_URL=https://configured.supabase.co\nSUPABASE_PUBLISHABLE_KEY=sb_publishable_local\n", encoding="utf-8"
+    )
+    assert guest_otp._config() == ("https://configured.supabase.co", "sb_publishable_local")
+
+
+def test_runtime_supabase_configuration_takes_precedence_over_local_file(otp, monkeypatch):
+    guest_otp.SUPABASE_ENV_PATH.write_text(
+        "SUPABASE_URL=https://local.supabase.co\nSUPABASE_PUBLISHABLE_KEY=sb_publishable_local\n", encoding="utf-8"
+    )
+    assert guest_otp._config() == ("https://project.supabase.co", "sb_publishable_test")
+    monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "legacy-runtime-key")
+    assert guest_otp._config() == ("https://project.supabase.co", "legacy-runtime-key")
+
+
+def test_streamlit_guest_buttons_are_enabled_without_coming_soon_message(otp, monkeypatch):
+    from streamlit.testing.v1 import AppTest
+
+    monkeypatch.setenv("SUPABASE_URL", "")
+    app = AppTest.from_file("app/streamlit_app.py", default_timeout=15).run()
+    assert not app.exception
+    for label in ("Enviar token", "Entrar"):
+        assert not next(button for button in app.button if button.label == label).disabled
+    assert not any("estará disponible" in message.value for message in app.info)
+    app.text_input(key="guest_email").set_value("guest@example.com")
+    next(button for button in app.button if button.label == "Enviar token").click().run()
+    assert not app.exception
+    assert any("configurado" in error.value for error in app.error)
+    assert not app.success
     assert storage.user_count() == 0
 
 

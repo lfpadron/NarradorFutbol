@@ -36,7 +36,7 @@ uv sync
 
 StatsBomb Open Data no requiere credenciales. Puedes copiar `.env.example` a `.env` si quieres cambiar la ruta de datos.
 
-Variables clave para v01:
+Variables clave:
 
 ```env
 NARRADOR_DATA_DIR=data
@@ -45,21 +45,17 @@ APP_BASE_URL=http://localhost:8501
 SEED_ADMIN_EMAIL_1=admin1@example.com
 SEED_ADMIN_EMAIL_2=admin2@example.com
 SEED_ADMIN_PASSWORD=ChangeMe-v01!
-INVITATION_TTL_HOURS=72
+SUPABASE_URL=https://TU-PROYECTO.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
 NARRADOR_USER_EMAIL=demo@example.com
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_USERNAME=
-SMTP_PASSWORD=
-SMTP_FROM_EMAIL=
-SMTP_FROM_NAME=Narrador Futbol
-SMTP_USE_TLS=true
-SMTP_USE_SSL=false
 ```
 
-En local, si no configuras SMTP, las invitaciones se muestran en pantalla dentro de la página **Login** para copiarlas manualmente. Si SMTP está configurado, el correo incluye enlace de invitación y token.
+Supabase envía el token de acceso de los invitados. Configura sus plantillas de
+correo y su servidor SMTP siguiendo [Acceso de invitados con Supabase](#acceso-de-invitados-con-supabase).
+Las credenciales SMTP se guardan en Supabase; la aplicación solo necesita la URL
+del proyecto y su clave pública. El token nunca se muestra en la pantalla de login.
 
 ## Ejecutar localmente
 
@@ -82,7 +78,8 @@ Entra a la página **Login**. Los admins semilla se crean al iniciar con:
 - `SEED_ADMIN_EMAIL_2`
 - `SEED_ADMIN_PASSWORD`
 
-Después, un admin puede invitar usuarios `analyst`, ver usuarios y activar/desactivar cuentas.
+Después, un administrador puede crear y administrar cuentas desde **Usuarios**.
+Los invitados se registran automáticamente al verificar su correo con el token.
 
 ## Ejecutar en contenedor
 
@@ -108,15 +105,10 @@ El contenedor expone Streamlit en `http://localhost:8501` y monta:
 - `./data/analytics:/app/data/analytics`
 - `./data/security:/app/data/security`
 
-En despliegue, define `APP_BASE_URL` con la URL publica de Streamlit, por ejemplo
-`https://narrador.tu-dominio.com`. Esa URL se usa para generar los enlaces absolutos
-de invitacion por correo.
-
-Para enviar invitaciones por SMTP, configura `SMTP_HOST`, `SMTP_PORT`,
-`SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`,
-`SMTP_USE_TLS` y `SMTP_USE_SSL` en el `.env` usado por Compose. Si esas variables
-no estan completas, la app crea la invitacion pero muestra el enlace/token en la
-pantalla de **Login** para copiarlo manualmente.
+En despliegue, configura `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY` en el `.env`
+usado por Compose. En Supabase, establece Site URL con la URL pública de Streamlit
+y configura el SMTP propio para enviar a los asistentes. El acceso de invitados
+utiliza un código capturado en la app y no necesita un enlace de redirección.
 
 Los PDFs generados quedan persistidos en los volumenes montados:
 
@@ -1007,6 +999,10 @@ uv run streamlit run app/streamlit_app.py
 
 La raíz de la app abre **Iniciar sesión**. El acceso correcto lleva a **Mi usuario**,
 donde el nombre es opcional y editable; correo y rol son de solo lectura.
+Administradores y analistas también pueden actualizar su contraseña desde esta
+página: deben capturar la contraseña actual, la nueva (mínimo 10 caracteres) y su
+confirmación. El cambio mantiene la sesión actual e invalida las anteriores.
+Los campos y el botón de actualización están deshabilitados para los invitados.
 
 | Rol | Acceso |
 | --- | --- |
@@ -1066,6 +1062,10 @@ Configuración del proyecto Supabase:
    [`deploy/supabase/guest_otp_email.html`](deploy/supabase/guest_otp_email.html).
    La variable `{{ .Token }}` muestra el código. Asunto sugerido: “Tu token de acceso
    al Narrador de Fútbol”.
+   **Confirm signup** se usa para un correo nuevo; **Magic Link**, para uno ya
+   confirmado. Si llega “Confirm your email address” con un enlace y sin código,
+   falta actualizar la plantilla de alta. Guarda ambas plantillas antes de pedir
+   un token nuevo: los correos ya enviados no cambian.
 4. Configura SMTP propio dentro de Supabase: servidor, puerto, usuario, contraseña,
    correo remitente y nombre remitente. Verifica el dominio con tu proveedor de correo.
    El servicio predeterminado solo envía a miembros autorizados del proyecto y no
@@ -1080,9 +1080,14 @@ Configuración del proyecto Supabase:
 El formulario actual no incorpora CAPTCHA. Si lo habilitas en Supabase Auth,
 será necesario conectar ese desafío antes de usar este flujo.
 
-Sin los parámetros de Supabase, el acceso de equipo sigue funcionando y la sección
-de invitados indica que falta configuración. Los tokens no se muestran en pantalla,
-no se guardan localmente y las sesiones del proveedor no se comparten entre asistentes.
+Los botones **Enviar token** y **Entrar** están habilitados en el login. Si falta la
+configuración de Supabase, al solicitar el acceso se muestra un error y no se crea
+la cuenta ni se simula un envío. La app lee los parámetros de las variables de
+entorno y, cuando faltan, del `.env` del proyecto; esto permite agregar los parámetros
+locales sin reiniciar Streamlit. En contenedores, hay que recrear el servicio para
+aplicar cambios a las variables de entorno de Compose.
+Los tokens no se muestran en pantalla, no se guardan localmente y las sesiones del
+proveedor no se comparten entre asistentes.
 
 Antes del evento, prueba con un correo externo nuevo y otro ya registrado: enviar
 el código, entrar, guardar el nombre, cerrar sesión y volver a entrar. Prueba también

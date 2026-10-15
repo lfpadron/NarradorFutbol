@@ -146,6 +146,65 @@ def test_sessions_revoked_on_disable_role_and_password_changes(accounts):
     assert storage.validate_session(user) is None
 
 
+@pytest.mark.parametrize("role", [ROLE_ADMIN, ROLE_ANALYST])
+def test_staff_change_own_password_requires_reauthentication_and_renews_session(accounts, role):
+    admin, db = accounts
+    user = storage.create_user("member@example.com", "Member", "Password123!", role, True, actor=admin)
+    updated = storage.change_own_password("Password123!", "Replacement123!", actor=user)
+    assert updated["id"] == user["id"]
+    assert updated["role"] == role and updated["name"] == "Member"
+    assert updated["session_version"] == user["session_version"] + 1
+    assert storage.validate_session(user) is None
+    assert storage.validate_session(updated) == updated
+    assert storage.authenticate_user(user["email"], "Password123!") is None
+    assert storage.authenticate_user(user["email"], "Replacement123!") == updated
+    assert storage.authenticate_user(admin["email"], "TestPassword123!") == admin
+    with storage.get_connection(db) as connection:
+        stored = connection.execute("SELECT password_hash FROM users WHERE id = ?", (user["id"],)).fetchone()[0]
+    assert "Replacement123!" not in stored
+
+
+@pytest.mark.parametrize(
+    "current,new,message",
+    [
+        ("", "Replacement123!", "actual es incorrecta"),
+        ("WrongPassword!", "Replacement123!", "actual es incorrecta"),
+        ("TestPassword123!", "short", "al menos 10"),
+        ("TestPassword123!", "x" * 1025, "demasiado larga"),
+    ],
+)
+def test_rejected_own_password_change_preserves_password_and_session(accounts, current, new, message):
+    admin, db = accounts
+    with pytest.raises(ValueError, match=message):
+        storage.change_own_password(current, new, actor=admin)
+    assert storage.authenticate_user(admin["email"], "TestPassword123!") == admin
+    assert storage.validate_session(admin) == admin
+
+
+def test_guest_cannot_change_own_password_even_with_forged_role(accounts):
+    admin, db = accounts
+    guest = storage.create_user("guest@example.com", "Guest", "Password123!", ROLE_GUEST, True, actor=admin)
+    guest["role"] = ROLE_ADMIN
+    with pytest.raises(ValueError, match="invitados"):
+        storage.change_own_password("Password123!", "Replacement123!", actor=guest)
+    with storage.get_connection(db) as connection:
+        assert connection.execute("SELECT session_version FROM users WHERE id = ?", (guest["id"],)).fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("invalidate", ["disable", "role", "password"])
+def test_invalidated_session_cannot_change_own_password(accounts, invalidate):
+    admin, db = accounts
+    user = storage.create_user("member@example.com", "Member", "Password123!", ROLE_ANALYST, True, actor=admin)
+    if invalidate == "disable":
+        storage.set_user_active(user["email"], False, actor=admin)
+    elif invalidate == "role":
+        storage.set_user_role(user["email"], ROLE_GUEST, actor=admin)
+    else:
+        storage.set_user_password(user["email"], "ResetByAdmin123!", actor=admin)
+    with pytest.raises(ValueError, match="sesión ya no está activa"):
+        storage.change_own_password("Password123!", "Replacement123!", actor=user)
+
+
 def test_first_password_for_promoted_guest_and_optional_name(accounts):
     admin, db = accounts
     guest = storage.provision_verified_guest("guest@example.com")
@@ -273,3 +332,51 @@ def test_profile_uses_existing_language_preference(accounts):
     assert not app.exception
     assert app.title[0].value == "My profile"
     assert next(field for field in app.text_input if field.label == "Role").value == "Administrator"
+    assert any(button.label == "Update password" for button in app.button)
+
+
+def test_streamlit_own_password_change_checks_current_and_confirmation(accounts):
+    from streamlit.testing.v1 import AppTest
+
+    admin, db = accounts
+    app = AppTest.from_file("app/streamlit_app.py", default_timeout=15)
+    app.session_state["auth_user"] = admin
+    app.run()
+    app.switch_page("pages/05_Mi_Usuario.py")
+
+    def submit(current, new, confirmation):
+        app.text_input(key="profile_current_password").set_value(current)
+        app.text_input(key="profile_new_password").set_value(new)
+        app.text_input(key="profile_confirm_password").set_value(confirmation)
+        next(button for button in app.button if button.label == "Actualizar contraseña").click().run()
+        assert not app.exception
+
+    submit("WrongPassword!", "Replacement123!", "Replacement123!")
+    assert any("actual es incorrecta" in error.value for error in app.error)
+    assert storage.validate_session(admin) == admin
+    submit("TestPassword123!", "Replacement123!", "Different123!")
+    assert any("no coinciden" in error.value for error in app.error)
+    assert storage.validate_session(admin) == admin
+    submit("TestPassword123!", "Replacement123!", "Replacement123!")
+    assert any("contraseña se ha actualizado" in message.value for message in app.success)
+    assert storage.authenticate_user(admin["email"], "TestPassword123!") is None
+    updated = app.session_state["auth_user"]
+    assert storage.authenticate_user(admin["email"], "Replacement123!") == updated
+    app.run()
+    assert not app.exception
+    assert app.title[0].value == "Mi usuario"
+    assert storage.validate_session(updated) == updated
+
+
+def test_streamlit_guest_password_form_is_disabled(accounts):
+    from streamlit.testing.v1 import AppTest
+
+    guest = storage.provision_verified_guest("guest@example.com")
+    app = AppTest.from_file("app/streamlit_app.py", default_timeout=15)
+    app.session_state["auth_user"] = guest
+    app.run()
+    assert not app.exception
+    for key in ("profile_current_password", "profile_new_password", "profile_confirm_password"):
+        assert app.text_input(key=key).disabled
+    assert next(button for button in app.button if button.label == "Actualizar contraseña").disabled
+    assert not next(button for button in app.button if button.label == "Guardar cambios").disabled
