@@ -14,6 +14,7 @@ from src.analytics.db import AnalyticsDatabaseError, query_df
 from src.security.streamlit_auth import require_login
 from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_score
+from src.ui.match_selector import get_selected_match_id, render_match_selector
 from src.ui.navigation import ensure_page_shell
 
 ensure_page_shell("Partidos")
@@ -87,17 +88,22 @@ st.dataframe(filtered, width="stretch")
 
 if filtered.empty:
     st.info("No hay partidos con esos filtros.")
-    stop_with_footer()
 
+# A selection made on another page remains available even outside these filters.
+selection_matches = matches[
+    matches["match_id"].isin(filtered["match_id"]) | matches["match_id"].eq(get_selected_match_id())
+]
 options = {
     f"{row.match_id} | {row.match_date} | {row.home_team_name} {row.home_score}-{row.away_score} {row.away_team_name}": int(
         row.match_id
     )
-    for row in filtered.itertuples(index=False)
+    for row in selection_matches.itertuples(index=False)
 }
-selected_label = st.selectbox("Seleccionar partido", list(options.keys()))
-selected_match_id = options[selected_label]
-row = filtered[filtered["match_id"] == selected_match_id].iloc[0]
+selected_match_id = render_match_selector("Seleccionar partido", options, key="matches_match")
+if selected_match_id is None:
+    st.info("Selecciona un partido para continuar.")
+    stop_with_footer()
+row = matches[matches["match_id"] == selected_match_id].iloc[0]
 
 st.subheader("Resumen")
 metric_cols = st.columns(5)

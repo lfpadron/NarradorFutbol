@@ -464,6 +464,8 @@ _EN_TRANSLATIONS: dict[str, str] = {
     "Scores de arquetipo": "Archetype scores",
     "Selecciona un equipo específico para construir la red de pases.": "Select a specific team to build the pass network.",
     "Seleccionar partido": "Select match",
+    "Selecciona un partido": "Select a match",
+    "Selecciona un partido para continuar.": "Select a match to continue.",
     "Secundario A": "Secondary A",
     "Secundario B": "Secondary B",
     "Sesión iniciada.": "Session started.",

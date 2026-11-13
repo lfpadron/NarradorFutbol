@@ -72,6 +72,7 @@ from src.ui.downloads import render_download_button, render_export_downloads
 from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_pct, format_score
 from src.ui.model_selector import render_model_selector
+from src.ui.match_selector import render_match_selector
 from src.ui.i18n import (
     current_language,
     is_english,
@@ -607,8 +608,10 @@ options = {
     )
     for row in matches.itertuples(index=False)
 }
-selected_label = st.selectbox("Partido", list(options.keys()))
-match_id = options[selected_label]
+match_id = render_match_selector("Partido", options, key="analysis_match")
+if match_id is None:
+    st.info("Selecciona un partido para continuar.")
+    stop_with_footer()
 
 try:
     detail = load_detail(match_id)
@@ -1599,27 +1602,11 @@ with tabs[9]:
     st.subheader("Comparador de partidos")
     st.write("Compara dos partidos transformados para revisar diferencias de volumen, eficacia, dominio e impacto.")
 
-    match_labels = list(options.keys())
-    default_a_index = next((idx for idx, label in enumerate(match_labels) if options[label] == 7534), 0)
-    default_b_index = next(
-        (idx for idx, label in enumerate(match_labels) if options[label] != options[match_labels[default_a_index]]),
-        0,
-    )
     selector_cols = st.columns(2)
-    comparison_label_a = selector_cols[0].selectbox(
-        "Partido A",
-        match_labels,
-        index=default_a_index,
-        key="comparison_match_a",
-    )
-    comparison_label_b = selector_cols[1].selectbox(
-        "Partido B",
-        match_labels,
-        index=default_b_index,
-        key="comparison_match_b",
-    )
-    comparison_match_a = options[comparison_label_a]
-    comparison_match_b = options[comparison_label_b]
+    with selector_cols[0]:
+        comparison_match_a = render_match_selector("Partido A", options, key="comparison_match_a")
+    with selector_cols[1]:
+        comparison_match_b = render_match_selector("Partido B", options, key="comparison_match_b")
     comparison_key = f"comparison_{comparison_match_a}_{comparison_match_b}"
     comparison_narrative_key = f"comparison_narrative_{language}_{comparison_match_a}_{comparison_match_b}"
     comparison_paths_key = f"comparison_paths_{language}_{comparison_match_a}_{comparison_match_b}"
@@ -1802,23 +1789,11 @@ with tabs[10]:
         "Compara jugadores dentro del mismo partido o entre partidos distintos con lectura estadística y contextual."
     )
 
-    player_match_labels = list(options.keys())
-    player_default_a_index = next((idx for idx, label in enumerate(player_match_labels) if options[label] == 7534), 0)
     player_selector_cols = st.columns(2)
-    player_label_a = player_selector_cols[0].selectbox(
-        "Partido A para jugador",
-        player_match_labels,
-        index=player_default_a_index,
-        key="player_comparison_match_a",
-    )
-    player_label_b = player_selector_cols[1].selectbox(
-        "Partido B para jugador",
-        player_match_labels,
-        index=player_default_a_index,
-        key="player_comparison_match_b",
-    )
-    player_match_a = options[player_label_a]
-    player_match_b = options[player_label_b]
+    with player_selector_cols[0]:
+        player_match_a = render_match_selector("Partido A para jugador", options, key="player_comparison_match_a")
+    with player_selector_cols[1]:
+        player_match_b = render_match_selector("Partido B para jugador", options, key="player_comparison_match_b")
 
     players_a = load_players_for_match(player_match_a)
     players_b = load_players_for_match(player_match_b)
@@ -2245,8 +2220,6 @@ with tabs[11]:
     st.write("Perfil táctico y arquetipos inferidos desde métricas observadas del partido.")
     scouting_model_v2 = render_model_selector("scouting_v2_model")
 
-    v2_match_labels = list(options.keys())
-    v2_default_a_index = next((idx for idx, label in enumerate(v2_match_labels) if options[label] == 7534), 0)
     v2_mode = st.radio(
         "Modo",
         ["Individual", "Comparativo"],
@@ -2254,13 +2227,8 @@ with tabs[11]:
         key="scouting_v2_mode",
     )
     v2_selector_cols = st.columns(2)
-    v2_label_a = v2_selector_cols[0].selectbox(
-        "Partido A",
-        v2_match_labels,
-        index=v2_default_a_index,
-        key="scouting_v2_match_a",
-    )
-    v2_match_a = options[v2_label_a]
+    with v2_selector_cols[0]:
+        v2_match_a = render_match_selector("Partido A", options, key="scouting_v2_match_a")
     v2_players_a = list_players_for_match(v2_match_a)
     if not v2_players_a:
         st.warning("No hay jugadores transformados para el Partido A.")
@@ -2286,13 +2254,8 @@ with tabs[11]:
         v2_match_b = None
         v2_player_b = None
         if v2_mode == "Comparativo":
-            v2_label_b = v2_selector_cols[1].selectbox(
-                "Partido B",
-                v2_match_labels,
-                index=v2_default_a_index,
-                key="scouting_v2_match_b",
-            )
-            v2_match_b = options[v2_label_b]
+            with v2_selector_cols[1]:
+                v2_match_b = render_match_selector("Partido B", options, key="scouting_v2_match_b")
             v2_players_b = list_players_for_match(v2_match_b)
             if not v2_players_b:
                 st.warning("No hay jugadores transformados para el Partido B.")

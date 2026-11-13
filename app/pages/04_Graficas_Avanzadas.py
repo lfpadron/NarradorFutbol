@@ -30,6 +30,7 @@ from src.ui.downloads import render_download_button
 from src.ui.footer import render_footer
 from src.ui.formatters import format_score
 from src.ui.i18n import current_language
+from src.ui.match_selector import render_match_selector
 from src.ui.navigation import ensure_page_shell
 from src.ui.pitch_charts import plot_pass_network
 from src.ui.shot_chain_panel import render_shot_chain_panel
@@ -159,8 +160,10 @@ match_options = {
     ): int(row.match_id)
     for row in matches.itertuples(index=False)
 }
-selected_match_label = st.selectbox("Partido", list(match_options.keys()))
-match_id = match_options[selected_match_label]
+match_id = render_match_selector("Partido", match_options, key="charts_match")
+if match_id is None:
+    st.info("Selecciona un partido para continuar.")
+    stop_with_footer()
 selected_match = matches.loc[matches["match_id"].eq(match_id)].iloc[0]
 home_team_name = str(selected_match.get("home_team_name") or "Local")
 away_team_name = str(selected_match.get("away_team_name") or "Visitante")
