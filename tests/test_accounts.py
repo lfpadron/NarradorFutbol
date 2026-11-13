@@ -258,7 +258,16 @@ def test_permissions_and_navigation(role, users, ingest):
     labels = {page["label"] for page in visible_page_definitions({"role": role, "is_active": True})}
     assert ("Usuarios" in labels) == users == can_access_page(role, "Usuarios")
     assert ("Ingesta" in labels) == ingest == can_access_page(role, "Ingesta")
-    assert {"Mi usuario", "Partidos", "Análisis", "Gráficas avanzadas"} <= labels
+    assert {
+        "Mi usuario",
+        "Partidos",
+        "Análisis de partidos",
+        "Análisis avanzado",
+        "Análisis de jugadas",
+        "Análisis de jugadores",
+        "Narrador AI",
+        "Narrador AI 2",
+    } <= labels
     assert "Inicio" not in labels
     assert [page["label"] for page in visible_page_definitions()] == ["Iniciar sesión"]
 

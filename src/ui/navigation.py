@@ -26,6 +26,7 @@ PAGE_DEFINITIONS = [
         "path": "pages/05_Mi_Usuario.py",
         "fallback_path": APP_ROOT / "pages" / "05_Mi_Usuario.py",
         "label": "Mi usuario",
+        "section": "Administración de usuarios",
         "icon": ":material/account_circle:",
         "default": False,
         "url_path": "Mi_Usuario",
@@ -34,6 +35,7 @@ PAGE_DEFINITIONS = [
         "path": "pages/06_Usuarios.py",
         "fallback_path": APP_ROOT / "pages" / "06_Usuarios.py",
         "label": "Usuarios",
+        "section": "Administración de usuarios",
         "icon": ":material/group:",
         "default": False,
         "url_path": "Usuarios",
@@ -42,6 +44,7 @@ PAGE_DEFINITIONS = [
         "path": "pages/01_Ingesta.py",
         "fallback_path": APP_ROOT / "pages" / "01_Ingesta.py",
         "label": "Ingesta",
+        "section": "Administración de datos",
         "icon": ":material/cloud_download:",
         "default": False,
         "url_path": "Ingesta",
@@ -50,6 +53,7 @@ PAGE_DEFINITIONS = [
         "path": "pages/02_Partidos.py",
         "fallback_path": APP_ROOT / "pages" / "02_Partidos.py",
         "label": "Partidos",
+        "section": "Administración de datos",
         "icon": ":material/sports_soccer:",
         "default": False,
         "url_path": "Partidos",
@@ -57,7 +61,9 @@ PAGE_DEFINITIONS = [
     {
         "path": "pages/03_Analisis.py",
         "fallback_path": APP_ROOT / "pages" / "03_Analisis.py",
-        "label": "Análisis",
+        "label": "Análisis de partidos",
+        "permission": "Análisis",
+        "section": "Análisis de datos",
         "icon": ":material/analytics:",
         "default": False,
         "url_path": "Analisis",
@@ -65,10 +71,52 @@ PAGE_DEFINITIONS = [
     {
         "path": "pages/04_Graficas_Avanzadas.py",
         "fallback_path": APP_ROOT / "pages" / "04_Graficas_Avanzadas.py",
-        "label": "Gráficas avanzadas",
+        "label": "Análisis avanzado",
+        "permission": "Gráficas avanzadas",
+        "section": "Análisis de datos",
         "icon": ":material/monitoring:",
         "default": False,
         "url_path": "Graficas_Avanzadas",
+    },
+    {
+        "path": "pages/07_Analisis_Jugadas.py",
+        "fallback_path": APP_ROOT / "pages" / "07_Analisis_Jugadas.py",
+        "label": "Análisis de jugadas",
+        "permission": "Gráficas avanzadas",
+        "section": "Análisis de datos",
+        "icon": ":material/animation:",
+        "default": False,
+        "url_path": "Analisis_Jugadas",
+    },
+    {
+        "path": "pages/08_Analisis_Jugadores.py",
+        "fallback_path": APP_ROOT / "pages" / "08_Analisis_Jugadores.py",
+        "label": "Análisis de jugadores",
+        "permission": "Análisis",
+        "section": "Análisis de datos",
+        "icon": ":material/person_search:",
+        "default": False,
+        "url_path": "Analisis_Jugadores",
+    },
+    {
+        "path": "pages/09_Narrador_AI.py",
+        "fallback_path": APP_ROOT / "pages" / "09_Narrador_AI.py",
+        "label": "Narrador AI",
+        "permission": "Análisis",
+        "section": "Narradores AI",
+        "icon": ":material/mic:",
+        "default": False,
+        "url_path": "Narrador_AI",
+    },
+    {
+        "path": "pages/10_Narrador_AI_2.py",
+        "fallback_path": APP_ROOT / "pages" / "10_Narrador_AI_2.py",
+        "label": "Narrador AI 2",
+        "permission": "Análisis",
+        "section": "Narradores AI",
+        "icon": ":material/record_voice_over:",
+        "default": False,
+        "url_path": "Narrador_AI_2",
     },
 ]
 
@@ -78,7 +126,11 @@ def visible_page_definitions(user: dict | None = None) -> list[dict[str, Any]]:
         definition
         for definition in PAGE_DEFINITIONS
         if definition["label"] == "Iniciar sesión"
-        or (user and user.get("is_active") and can_access_page(user["role"], str(definition["label"])))
+        or (
+            user
+            and user.get("is_active")
+            and can_access_page(user["role"], str(definition.get("permission", definition["label"])))
+        )
     ]
 
 
@@ -103,11 +155,16 @@ def render_sidebar_navigation(language: str, pages: list[Any] | None = None, use
 
     query_params = {"lang": language} if language != DEFAULT_LANGUAGE else None
     with st.sidebar:
-        st.markdown("**Narrador de Fútbol**")
+        st.markdown(f"**{t('Narrador de Fútbol', language=language)}**")
         st.caption("Astrogato Labs")
+        current_section = None
         for index, definition in enumerate(visible_page_definitions(user)):
             if user and definition["label"] == "Iniciar sesión":
                 continue
+            section = definition.get("section")
+            if section and section != current_section:
+                st.caption(str(t(section, language=language)))
+                current_section = section
             label = str(t(definition["label"], language=language))
             target = pages[index] if pages else definition["fallback_path"]
             if st.button(

@@ -117,6 +117,16 @@ def match_pages(tmp_path, monkeypatch):
     monkeypatch.setattr(advanced_charts, "build_advanced_chart_bundle", charts)
     monkeypatch.setattr(advanced_charts, "get_match_teams", teams)
     monkeypatch.setattr(advanced_charts, "get_players_for_heatmap", players)
+    from src.ui import advanced_page, analysis_page, play_analysis_page
+
+    monkeypatch.setattr(analysis_page, "query_df", db.query_df)
+    monkeypatch.setattr(analysis_page, "get_match_summary", detail)
+    monkeypatch.setattr(analysis_page, "build_ai_match_context", context)
+    monkeypatch.setattr(advanced_page, "query_df", db.query_df)
+    monkeypatch.setattr(advanced_page, "build_advanced_chart_bundle", charts)
+    monkeypatch.setattr(advanced_page, "get_match_teams", teams)
+    monkeypatch.setattr(advanced_page, "get_players_for_heatmap", players)
+    monkeypatch.setattr(play_analysis_page, "render_shot_chain_panel", Mock())
     app = AppTest.from_file("app/streamlit_app.py", default_timeout=30)
     app.session_state["auth_user"] = user
     app.run()
@@ -130,6 +140,10 @@ def test_real_pages_remain_empty_and_skip_match_work_until_selected(match_pages)
         ("02_Partidos.py", "matches_match"),
         ("03_Analisis.py", "analysis_match"),
         ("04_Graficas_Avanzadas.py", "charts_match"),
+        ("07_Analisis_Jugadas.py", "plays_match"),
+        ("08_Analisis_Jugadores.py", "analysis_match"),
+        ("09_Narrador_AI.py", "analysis_match"),
+        ("10_Narrador_AI_2.py", "analysis_match"),
     ]:
         app.switch_page(f"pages/{page}").run()
         assert not app.exception
