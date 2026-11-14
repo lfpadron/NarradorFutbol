@@ -69,6 +69,7 @@ from src.ui.downloads import render_download_button, render_export_downloads
 from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_pct, format_score
 from src.ui.model_selector import render_model_selector
+from src.ui.player_cards_panel import render_player_cards_panel
 from src.ui.match_selector import render_match_selector
 from src.ui.i18n import (
     current_language,
@@ -598,7 +599,7 @@ ANALYSIS_PAGE_TABS = {
         "Datos",
         "xG visitante-local",
     ),
-    "Análisis de jugadores": ("Comparador de jugadores", "Scouting AI v2"),
+    "Análisis de jugadores": ("Comparador de jugadores", "Scouting AI v2", "Tarjetas de jugadores"),
     "Narrador AI": (),
     "Narrador AI 2": (),
 }
@@ -1806,6 +1807,10 @@ def render_analysis_page(page_title: str) -> None:
                         st.write(f"- {warning}")
                 st.markdown("### Narrativa comparativa")
                 st.markdown(current_narrative.get("narrative_markdown") or "")
+
+    if "Tarjetas de jugadores" in tabs:
+        with tabs["Tarjetas de jugadores"]:
+            render_player_cards_panel(match_id, load_players_for_match(match_id))
 
     if "Comparador de jugadores" in tabs:
         with tabs["Comparador de jugadores"]:

@@ -150,7 +150,7 @@ def test_pages_keep_their_panels_and_shared_match_when_navigating(navigation_app
             "08_Analisis_Jugadores.py",
             "Análisis de jugadores",
             "analysis_match",
-            ["Comparador de jugadores", "Scouting AI v2"],
+            ["Comparador de jugadores", "Scouting AI v2", "Tarjetas de jugadores"],
         ),
         ("09_Narrador_AI.py", "Narrador AI", "analysis_match", []),
         ("10_Narrador_AI_2.py", "Narrador AI 2", "analysis_match", []),
@@ -195,5 +195,5 @@ def test_language_change_keeps_current_page_and_match(navigation_app):
     app.button(key="language_selector_en").click().run()
     assert not app.exception
     assert app.title[0].value == "Player analysis"
-    assert [tab.label for tab in app.tabs] == ["Player comparison", "Scouting AI v2"]
+    assert [tab.label for tab in app.tabs] == ["Player comparison", "Scouting AI v2", "Player cards"]
     assert app.selectbox(key="analysis_match").value == 7534

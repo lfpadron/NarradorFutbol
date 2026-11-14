@@ -144,6 +144,7 @@ _EN_TRANSLATIONS: dict[str, str] = {
     "Comparación de tonos": "Tone comparison",
     "Comparación directa": "Direct comparison",
     "Comparador de jugadores": "Player comparison",
+    "Tarjetas de jugadores": "Player cards",
     "Comparador de partidos": "Match comparison",
     "Comparar estilos": "Compare styles",
     "Comparar jugadores": "Compare players",
