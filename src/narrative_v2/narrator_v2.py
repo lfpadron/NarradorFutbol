@@ -20,7 +20,7 @@ from src.narrative_v2.prompt_builder_v2 import build_specialized_prompt
 from src.narrative_v2.section_builder import build_context_for_style
 from src.narrative_v2.style_evaluator import evaluate_style_fit
 from src.narrative_v2.style_profiles import STYLE_PROFILES, get_style_profile
-from src.reports.branding import add_docx_footer
+from src.reports.branding import add_docx_footer, add_markdown_footer
 from src.reports.pdf_report import render_pdf_report
 from src.ui.i18n import is_english, style_display_name, translate_text
 
@@ -150,7 +150,7 @@ def save_specialized_narrative_export(
     markdown_text = render_specialized_narrative_markdown(result)
     html_text = render_specialized_narrative_html(result, markdown_text)
 
-    paths["markdown"].write_text(markdown_text, encoding="utf-8")
+    paths["markdown"].write_text(add_markdown_footer(markdown_text), encoding="utf-8")
     with paths["json"].open("w", encoding="utf-8") as file:
         json.dump(to_jsonable(result), file, ensure_ascii=False, indent=2)
         file.write("\n")

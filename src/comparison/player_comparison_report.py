@@ -9,6 +9,7 @@ from typing import Any
 
 from src.config import COMPARISONS_DIR, project_relative
 from src.ingestion.utils import to_jsonable
+from src.reports.branding import add_markdown_footer
 from src.ui.i18n import is_english, translate_text
 
 
@@ -109,7 +110,9 @@ def save_player_comparison(
     with paths["json"].open("w", encoding="utf-8") as file:
         json.dump(to_jsonable(payload), file, ensure_ascii=False, indent=2)
         file.write("\n")
-    paths["markdown"].write_text(render_player_comparison_markdown(comparison, narrative), encoding="utf-8")
+    paths["markdown"].write_text(
+        add_markdown_footer(render_player_comparison_markdown(comparison, narrative)), encoding="utf-8"
+    )
     return {
         "json": project_relative(paths["json"]),
         "markdown": project_relative(paths["markdown"]),

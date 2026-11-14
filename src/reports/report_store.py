@@ -10,6 +10,7 @@ from typing import Any
 
 from src.config import REPORTS_DIR, project_relative
 from src.ingestion.utils import to_jsonable
+from src.reports.branding import add_markdown_footer
 from src.reports.docx_report import render_docx_report
 from src.reports.pdf_report import render_pdf_report
 
@@ -31,7 +32,7 @@ def save_report(
     pdf_path = paths["pdf"]
     docx_path = paths["docx"]
 
-    md_path.write_text(markdown_text, encoding="utf-8")
+    md_path.write_text(add_markdown_footer(markdown_text), encoding="utf-8")
     html_path.write_text(html_text, encoding="utf-8")
     with json_path.open("w", encoding="utf-8") as file:
         json.dump(to_jsonable(report), file, ensure_ascii=False, indent=2)

@@ -8,6 +8,7 @@ from typing import Any
 
 from src.config import ANALYTICS_EXPORTS_DIR
 from src.ingestion.utils import to_jsonable
+from src.reports.branding import add_markdown_footer
 
 
 def save_narrative(result: dict[str, Any]) -> tuple[str, str]:
@@ -18,7 +19,7 @@ def save_narrative(result: dict[str, Any]) -> tuple[str, str]:
     md_path = ANALYTICS_EXPORTS_DIR / f"narrative.match-{match_id}.{language}.{tone}.md"
     json_path = ANALYTICS_EXPORTS_DIR / f"narrative.match-{match_id}.{language}.{tone}.json"
 
-    md_path.write_text(str(result.get("narrative_markdown") or ""), encoding="utf-8")
+    md_path.write_text(add_markdown_footer(str(result.get("narrative_markdown") or "")), encoding="utf-8")
     with json_path.open("w", encoding="utf-8") as file:
         json.dump(to_jsonable(result), file, ensure_ascii=False, indent=2)
         file.write("\n")

@@ -14,6 +14,7 @@ import markdown
 from src.comparison.player_visuals import player_chart_colors, plot_player_radar
 from src.config import SCOUTING_DIR, project_relative
 from src.ingestion.utils import to_jsonable
+from src.reports.branding import add_markdown_footer
 from src.reports.pdf_report import render_pdf_report
 from src.scouting.scouting_exporter import render_scouting_docx
 from src.ui.i18n import is_english, translate_text
@@ -35,7 +36,7 @@ def save_scouting_v2_report(
     markdown_text = render_scouting_v2_markdown(result)
     radar_png, radar_error = _render_radar_png(result)
     html_text = render_scouting_v2_html(result, markdown_text, radar_png=radar_png)
-    paths["markdown"].write_text(markdown_text, encoding="utf-8")
+    paths["markdown"].write_text(add_markdown_footer(markdown_text), encoding="utf-8")
     with paths["json"].open("w", encoding="utf-8") as file:
         json.dump(to_jsonable(result), file, ensure_ascii=False, indent=2)
         file.write("\n")

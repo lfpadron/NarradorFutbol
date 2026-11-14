@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from src.config import REPORTS_DIR, project_relative
-from src.reports.branding import draw_reportlab_footer
+from src.reports.branding import reportlab_closing_block
 from src.ui.i18n import current_language, is_english, translate_text
 
 
@@ -103,7 +103,8 @@ def _render_pdf(
             topMargin=0.55 * inch,
             bottomMargin=0.75 * inch,
         )
-        document.build(story, onFirstPage=draw_reportlab_footer, onLaterPages=draw_reportlab_footer)
+        story.append(reportlab_closing_block(document.width - 12))
+        document.build(story)
         return {"status": "generated", "path": path.as_posix(), "error_message": None, "warnings": image_warnings}
     except Exception as exc:
         return {"status": "failed", "path": path.as_posix(), "error_message": str(exc), "warnings": image_warnings}

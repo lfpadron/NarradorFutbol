@@ -13,7 +13,7 @@ from typing import Any
 from xml.sax.saxutils import escape
 
 from src.config import PROJECT_ROOT
-from src.reports.branding import add_report_footer_to_html, draw_reportlab_footer
+from src.reports.branding import add_report_footer_to_html, reportlab_closing_block
 
 
 def render_pdf_report(html: str, output_path: str) -> dict[str, Any]:
@@ -204,7 +204,7 @@ def _write_reportlab_document(
         bottomMargin=margin,
         title=path.stem,
     )
-    document.build(list(story), onFirstPage=draw_reportlab_footer, onLaterPages=draw_reportlab_footer)
+    document.build([*story, reportlab_closing_block(document.width - 12)])
 
 
 def _prepare_pdf_output_path(path: Path, english: bool = False) -> tuple[Path, str | None]:

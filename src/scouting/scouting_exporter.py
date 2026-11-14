@@ -14,7 +14,7 @@ import markdown
 
 from src.config import SCOUTING_DIR, project_relative
 from src.ingestion.utils import to_jsonable
-from src.reports.branding import add_docx_footer
+from src.reports.branding import add_docx_footer, add_markdown_footer
 from src.reports.pdf_report import render_pdf_report
 from src.scouting.scouting_history import build_scouting_history_record, record_scouting_generation
 from src.ui.i18n import is_english, translate_text
@@ -40,7 +40,7 @@ def save_scouting_export(
     markdown_text = render_scouting_markdown(result)
     html_text = render_scouting_html(result, markdown_text)
 
-    paths["markdown"].write_text(markdown_text, encoding="utf-8")
+    paths["markdown"].write_text(add_markdown_footer(markdown_text), encoding="utf-8")
     with paths["json"].open("w", encoding="utf-8") as file:
         json.dump(to_jsonable(result), file, ensure_ascii=False, indent=2)
         file.write("\n")

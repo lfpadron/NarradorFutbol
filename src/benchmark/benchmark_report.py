@@ -8,6 +8,7 @@ from typing import Any
 
 from src.config import BENCHMARK_RESULTS_DIR, project_relative
 from src.ingestion.utils import to_jsonable
+from src.reports.branding import add_markdown_footer
 
 
 def render_benchmark_markdown(result: dict[str, Any]) -> str:
@@ -47,7 +48,7 @@ def save_benchmark_result(result: dict[str, Any]) -> dict[str, str]:
     with json_path.open("w", encoding="utf-8") as file:
         json.dump(to_jsonable(result), file, ensure_ascii=False, indent=2)
         file.write("\n")
-    md_path.write_text(render_benchmark_markdown(result), encoding="utf-8")
+    md_path.write_text(add_markdown_footer(render_benchmark_markdown(result)), encoding="utf-8")
     return {"json": project_relative(json_path), "markdown": project_relative(md_path)}
 
 

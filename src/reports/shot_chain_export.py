@@ -12,6 +12,7 @@ from threading import RLock
 from typing import Any
 
 from src.analytics.shot_chains import shot_chain_title
+from src.reports.branding import reportlab_closing_block
 from src.ui.shot_chain_charts import ShotAnimationScene
 
 # Matplotlib is not thread-safe; serialize video scenes across Streamlit sessions.
@@ -20,23 +21,28 @@ RENDER_LOCK = RLock()
 
 def shot_chain_pdf(chain: dict[str, Any], png: bytes, language: str = "es") -> bytes:
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.utils import ImageReader
-    from reportlab.pdfgen.canvas import Canvas
+    from reportlab.platypus import Image, SimpleDocTemplate, Spacer
 
     output = BytesIO()
     width, height = landscape(A4)
-    canvas = Canvas(output, pagesize=(width, height))
-    canvas.setTitle(shot_chain_title(chain, language))
-    canvas.setAuthor("Narrador Fútbol")
-    canvas.setFillColorRGB(8 / 255, 27 / 255, 35 / 255)
-    canvas.rect(0, 0, width, height, fill=1, stroke=0)
-    image = ImageReader(BytesIO(png))
-    image_width, image_height = image.getSize()
-    scale = min(width / image_width, height / image_height)
-    display_width, display_height = image_width * scale, image_height * scale
-    canvas.drawImage(image, (width - display_width) / 2, (height - display_height) / 2, display_width, display_height)
-    canvas.showPage()
-    canvas.save()
+    margin = 28
+    content_width = width - 2 * margin - 12
+    image = Image(BytesIO(png))
+    # Reserve room for the closing credits below the artwork on this landscape page.
+    scale = min(content_width / image.imageWidth, (height - 2 * margin - 140) / image.imageHeight)
+    image.drawWidth = image.imageWidth * scale
+    image.drawHeight = image.imageHeight * scale
+    document = SimpleDocTemplate(
+        output,
+        pagesize=(width, height),
+        leftMargin=margin,
+        rightMargin=margin,
+        topMargin=margin,
+        bottomMargin=margin,
+        title=shot_chain_title(chain, language),
+        author="Narrador Fútbol",
+    )
+    document.build([image, Spacer(1, 4), reportlab_closing_block(content_width)])
     return output.getvalue()
 
 

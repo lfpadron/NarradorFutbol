@@ -9,6 +9,7 @@ from src.analytics.ai_context import build_ai_match_context
 from src.config import ANALYTICS_EXPORTS_DIR
 from src.ingestion.utils import to_jsonable
 from src.narrative.tone_comparison import compare_tones
+from src.reports.branding import add_markdown_footer
 from src.ui.i18n import is_english
 
 
@@ -45,7 +46,7 @@ def save_review_report(report: dict[str, Any]) -> tuple[str, str]:
     md_path = ANALYTICS_EXPORTS_DIR / f"review.match-{match_id}.{language}.md"
     json_path = ANALYTICS_EXPORTS_DIR / f"review.match-{match_id}.{language}.json"
 
-    md_path.write_text(_report_to_markdown(report), encoding="utf-8")
+    md_path.write_text(add_markdown_footer(_report_to_markdown(report)), encoding="utf-8")
     with json_path.open("w", encoding="utf-8") as file:
         json.dump(to_jsonable(report), file, ensure_ascii=False, indent=2)
         file.write("\n")
