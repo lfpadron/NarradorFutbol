@@ -1,11 +1,44 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-cd /d "%~dp0"
-
 set "REPO_URL=https://github.com/lfpadron/NarradorFutbol.git"
 set "DEFAULT_BRANCH=main"
 set "MODE=%~1"
+set "ERROR_STEP=Iniciar la operacion"
+set "ERROR_DETAILS="
+set "SUCCESS_MESSAGE=Operacion completada correctamente."
+set "ERROR_LOG=%TEMP%\NarradorFutbol_subir_repo_%RANDOM%_%RANDOM%.log"
+
+call :main 2> "%ERROR_LOG%"
+set "RESULT_CODE=!errorlevel!"
+echo.
+echo ==========================================
+if "!RESULT_CODE!"=="0" (
+    if exist "%ERROR_LOG%" type "%ERROR_LOG%"
+    echo EXITO: !SUCCESS_MESSAGE!
+) else (
+    echo ERROR: la operacion no se completo. Codigo de salida: !RESULT_CODE!
+    echo Paso: !ERROR_STEP!
+    if defined ERROR_DETAILS echo Detalles: !ERROR_DETAILS!
+    if exist "%ERROR_LOG%" for %%L in ("%ERROR_LOG%") do if %%~zL GTR 0 (
+        echo.
+        echo Detalles tecnicos:
+        type "%ERROR_LOG%"
+    )
+)
+echo ==========================================
+if exist "%ERROR_LOG%" del /q "%ERROR_LOG%" >nul 2>nul
+echo.
+echo Presiona una tecla para continuar . . .
+pause >nul
+exit /b !RESULT_CODE!
+
+:main
+cd /d "%~dp0"
+if errorlevel 1 (
+    set "ERROR_DETAILS=No se pudo abrir la carpeta del script."
+    exit /b 1
+)
 
 if /I "%MODE%"=="help" goto :help
 if /I "%MODE%"=="-h" goto :help
@@ -34,7 +67,9 @@ if /I "%MODE%"=="diff-only" (
 if not "%MODE%"=="" (
     echo Opcion no reconocida: %MODE%
     echo.
-    goto :help
+    set "ERROR_DETAILS=Opcion no reconocida: !MODE!"
+    call :help
+    exit /b 1
 )
 
 :menu
@@ -50,7 +85,10 @@ echo 3. Solo guardar diff seguro
 echo 4. Salir
 echo.
 choice /C 1234 /N /M "Elige una opcion [1-4]: "
-if errorlevel 4 exit /b 0
+if errorlevel 4 (
+    set "SUCCESS_MESSAGE=Salida solicitada. No se realizaron operaciones."
+    exit /b 0
+)
 if errorlevel 3 (
     set "SAVE_DIFF=S"
     set "DIFF_ONLY=S"
@@ -66,35 +104,45 @@ set "DIFF_ONLY=N"
 goto :run
 
 :run
+set "ERROR_STEP=Comprobar disponibilidad de Git"
 call :require_git
 if errorlevel 1 exit /b 1
+set "ERROR_STEP=Comprobar el repositorio local"
 call :ensure_repo
 if errorlevel 1 exit /b 1
 
 if /I "%DIFF_ONLY%"=="S" (
+    set "ERROR_STEP=Guardar el diff seguro"
     call :save_working_diff
     if errorlevel 1 exit /b 1
     echo.
     echo Diff guardado. No se hizo commit ni push.
+    set "SUCCESS_MESSAGE=Diff guardado en !DIFF_FILE!. No se hizo commit ni push."
     exit /b 0
 )
 
+set "ERROR_STEP=Configurar el remoto origin"
 call :ensure_origin
 if errorlevel 1 exit /b 1
+set "ERROR_STEP=Determinar la rama actual"
 call :current_branch
 if errorlevel 1 exit /b 1
+set "ERROR_STEP=Actualizar la referencia remota"
 call :refresh_origin
 if errorlevel 1 exit /b 1
+set "ERROR_STEP=Revisar la historia local pendiente de subir"
 call :guard_unpushed_history
 if errorlevel 1 exit /b 1
 
 if /I "%PREFLIGHT_ONLY%"=="S" (
     echo.
     echo Preparando cambios para revision segura...
+    set "ERROR_STEP=Preparar y revisar los cambios seguros"
     call :stage_safe_changes
     if errorlevel 1 exit /b 1
     echo.
     echo Revision lista. Cambios seguros preparados. No se hizo commit ni push.
+    set "SUCCESS_MESSAGE=Revision lista. No se hizo commit ni push."
     exit /b 0
 )
 
@@ -109,23 +157,29 @@ if not defined COMMIT_MSG set "COMMIT_MSG=Actualiza NarradorFutbol"
 
 echo.
 echo Preparando cambios...
+set "ERROR_STEP=Preparar y revisar los cambios seguros"
 call :stage_safe_changes
 if errorlevel 1 exit /b 1
 
 if /I "%SAVE_DIFF%"=="S" (
+    set "ERROR_STEP=Guardar el diff preparado"
     call :save_staged_diff
     if errorlevel 1 exit /b 1
     call :unstage_blocked_files
 )
 
+set "ERROR_STEP=Comprobar los cambios preparados para commit"
 git diff --cached --quiet
+if errorlevel 2 exit /b 1
 if errorlevel 1 (
     echo.
     echo Creando commit...
+    set "ERROR_STEP=Crear el commit"
     git commit -m "%COMMIT_MSG%"
     if errorlevel 1 (
         echo.
         echo No se pudo crear el commit. Revisa git config user.name/user.email o el estado del repo.
+        set "ERROR_DETAILS=No se pudo crear el commit. Revisa la identidad de Git y el estado del repositorio."
         exit /b 1
     )
 ) else (
@@ -135,21 +189,25 @@ if errorlevel 1 (
 
 echo.
 echo Subiendo rama !BRANCH! a origin...
+set "ERROR_STEP=Subir la rama !BRANCH! a origin"
 git push -u origin "!BRANCH!"
 if errorlevel 1 (
     echo.
     echo No se pudo hacer push. Revisa credenciales, permisos o conexion con GitHub.
+    set "ERROR_DETAILS=Fallo el push. Revisa los detalles tecnicos de Git, las credenciales, los permisos y la conexion."
     exit /b 1
 )
 
 echo.
 echo Listo. Codigo subido a %REPO_URL%
+set "SUCCESS_MESSAGE=Rama !BRANCH! subida a %REPO_URL%"
 exit /b 0
 
 :require_git
 where git >nul 2>nul
 if errorlevel 1 (
     echo Git no esta disponible en PATH.
+    set "ERROR_DETAILS=Git no esta disponible en PATH. Instala Git o revisa su configuracion."
     exit /b 1
 )
 exit /b 0
@@ -160,7 +218,10 @@ if not errorlevel 1 exit /b 0
 
 echo No se detecto un repositorio Git en esta carpeta.
 choice /C SN /M "Inicializar git aqui"
-if errorlevel 2 exit /b 1
+if errorlevel 2 (
+    set "ERROR_DETAILS=No hay un repositorio Git y se cancelo su inicializacion."
+    exit /b 1
+)
 
 git init
 if errorlevel 1 exit /b 1
@@ -186,7 +247,10 @@ echo Remote esperado:
 echo %REPO_URL%
 echo.
 choice /C SN /M "Cambiar origin al repo esperado"
-if errorlevel 2 exit /b 1
+if errorlevel 2 (
+    set "ERROR_DETAILS=El remoto origin no coincide con el esperado y se cancelo su cambio."
+    exit /b 1
+)
 
 git remote set-url origin "%REPO_URL%"
 if errorlevel 1 exit /b 1
@@ -198,6 +262,7 @@ echo Actualizando referencia remota...
 git fetch origin --prune
 if errorlevel 1 (
     echo No se pudo actualizar origin. Revisa conexion o credenciales antes de publicar.
+    set "ERROR_DETAILS=No se pudo actualizar origin. Revisa la conexion y las credenciales."
     exit /b 1
 )
 exit /b 0
@@ -209,6 +274,7 @@ if errorlevel 1 set "REMOTE_REF=origin/%DEFAULT_BRANCH%"
 git rev-parse --verify "!REMOTE_REF!" >nul 2>nul
 if errorlevel 1 (
     echo No se encontro una referencia remota para comparar historia local.
+    set "ERROR_DETAILS=No se encontro una referencia remota para comparar la historia local."
     exit /b 1
 )
 
@@ -223,6 +289,7 @@ if /I "!BLOCKED_HISTORY!"=="S" (
     echo.
     echo No se hara push: la historia local contiene archivos bloqueados.
     echo Crea una rama limpia desde !REMOTE_REF! o reescribe la historia antes de publicar.
+    set "ERROR_DETAILS=La historia local contiene archivos bloqueados. Consulta la lista mostrada arriba."
     exit /b 1
 )
 
@@ -231,6 +298,7 @@ if errorlevel 1 (
     echo.
     echo No se hara push: hay blobs mayores o iguales a 95 MB en commits no subidos.
     echo GitHub rechaza archivos grandes; limpia la historia antes de publicar.
+    set "ERROR_DETAILS=Hay archivos de 95 MB o mas en commits no subidos. Consulta la lista mostrada arriba."
     exit /b 1
 )
 
@@ -243,6 +311,7 @@ if /I "!SECRET_HISTORY!"=="S" (
     echo.
     echo No se hara push: se detecto material tipo PRIVATE KEY en archivos rastreados.
     echo Mueve la llave fuera del repo y limpia la historia antes de publicar.
+    set "ERROR_DETAILS=Se detecto material PRIVATE KEY en archivos rastreados. Consulta la lista mostrada arriba."
     exit /b 1
 )
 exit /b 0
@@ -253,19 +322,22 @@ for /f "delims=" %%B in ('git branch --show-current 2^>nul') do set "BRANCH=%%B"
 if defined BRANCH exit /b 0
 
 set "BRANCH=%DEFAULT_BRANCH%"
-git branch -M "%DEFAULT_BRANCH%" >nul 2>nul
+git branch -M "%DEFAULT_BRANCH%"
+if errorlevel 1 exit /b 1
 exit /b 0
 
 :stage_safe_changes
 git add -u -- .
 if errorlevel 1 (
     echo Error al preparar cambios rastreados con git add.
+    set "ERROR_DETAILS=No se pudieron preparar los cambios rastreados con git add."
     exit /b 1
 )
 for /f "delims=" %%F in ('git ls-files --others --exclude-standard') do (
     git add -- "%%F"
     if errorlevel 1 (
         echo Error al preparar archivo nuevo: %%F
+        set "ERROR_DETAILS=No se pudo preparar el archivo nuevo: %%F"
         exit /b 1
     )
 )
@@ -287,6 +359,7 @@ for /f "delims=" %%F in ('git diff --cached --name-only -- "diff_*.txt" "*.patch
 if /I "!BLOCKED_STAGED!"=="S" (
     echo.
     echo No se creara commit: hay archivos bloqueados preparados.
+    set "ERROR_DETAILS=Hay archivos bloqueados preparados para commit. Consulta la lista mostrada arriba."
     exit /b 1
 )
 exit /b 0
@@ -296,6 +369,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "$limit=95MB; $bad=$false
 if errorlevel 1 (
     echo.
     echo No se creara commit: hay archivos preparados mayores o iguales a 95 MB.
+    set "ERROR_DETAILS=Hay archivos preparados de 95 MB o mas. Consulta la lista mostrada arriba."
     exit /b 1
 )
 exit /b 0
@@ -309,6 +383,7 @@ for /f "delims=" %%F in ('git grep --cached -I -l -E "^[[:space:]]*-{5}BEGIN [A-
 if /I "!SECRET_STAGED!"=="S" (
     echo.
     echo No se creara commit: se detecto material tipo PRIVATE KEY en cambios preparados.
+    set "ERROR_DETAILS=Se detecto material PRIVATE KEY en cambios preparados. Consulta la lista mostrada arriba."
     exit /b 1
 )
 exit /b 0
@@ -335,6 +410,7 @@ echo Guardando diff en !DIFF_FILE!...
 ) > "!DIFF_FILE!"
 if errorlevel 1 (
     echo No se pudo guardar el diff.
+    set "ERROR_DETAILS=No se pudo guardar el diff en !DIFF_FILE!."
     exit /b 1
 )
 echo Diff guardado en !DIFF_FILE!
@@ -356,6 +432,7 @@ echo Guardando diff preparado en !DIFF_FILE!...
 ) > "!DIFF_FILE!"
 if errorlevel 1 (
     echo No se pudo guardar el diff preparado.
+    set "ERROR_DETAILS=No se pudo guardar el diff preparado en !DIFF_FILE!."
     exit /b 1
 )
 echo Diff guardado en !DIFF_FILE!
@@ -382,6 +459,7 @@ git diff --stat -- . ^
     ":(exclude)*.duckdb" ^
     ":(exclude)*.sqlite" ^
     ":(exclude)*.sqlite3"
+if errorlevel 1 exit /b 1
 echo.
 echo ===== git diff =====
 git diff -- . ^
@@ -403,6 +481,7 @@ git diff -- . ^
     ":(exclude)*.duckdb" ^
     ":(exclude)*.sqlite" ^
     ":(exclude)*.sqlite3"
+if errorlevel 1 exit /b 1
 echo.
 echo ===== git diff --cached --stat =====
 git diff --cached --stat -- . ^
@@ -424,6 +503,7 @@ git diff --cached --stat -- . ^
     ":(exclude)*.duckdb" ^
     ":(exclude)*.sqlite" ^
     ":(exclude)*.sqlite3"
+if errorlevel 1 exit /b 1
 echo.
 echo ===== git diff --cached =====
 git diff --cached -- . ^
@@ -445,6 +525,7 @@ git diff --cached -- . ^
     ":(exclude)*.duckdb" ^
     ":(exclude)*.sqlite" ^
     ":(exclude)*.sqlite3"
+if errorlevel 1 exit /b 1
 exit /b 0
 
 :write_safe_staged_diff
@@ -468,6 +549,7 @@ git diff --cached --stat -- . ^
     ":(exclude)*.duckdb" ^
     ":(exclude)*.sqlite" ^
     ":(exclude)*.sqlite3"
+if errorlevel 1 exit /b 1
 echo.
 echo ===== git diff --cached =====
 git diff --cached -- . ^
@@ -489,6 +571,7 @@ git diff --cached -- . ^
     ":(exclude)*.duckdb" ^
     ":(exclude)*.sqlite" ^
     ":(exclude)*.sqlite3"
+if errorlevel 1 exit /b 1
 exit /b 0
 
 :unstage_blocked_files
@@ -498,6 +581,7 @@ for %%F in (diff_*.txt *.patch *.key *.pem *.ppk *.p8 *.p12 *.pub id_rsa id_ed25
 exit /b 0
 
 :help
+set "SUCCESS_MESSAGE=Ayuda mostrada correctamente."
 echo Uso:
 echo   subir_repo.bat            Muestra menu interactivo
 echo   subir_repo.bat check      Revisa y prepara cambios seguros sin commit ni push
