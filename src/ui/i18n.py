@@ -27,6 +27,12 @@ STYLE_LABELS_EN = {
 }
 
 _EN_TRANSLATIONS: dict[str, str] = {
+    "Fuente: Hudl StatsBomb": "Source: Hudl StatsBomb",
+    "Datos de eventos proporcionados por Hudl StatsBomb Open Data. Uso exclusivo para análisis e investigación sin fines de lucro.": (
+        "Event data provided by Hudl StatsBomb Open Data. For non-profit analysis and research purposes only."
+    ),
+    "UNA MISIÓN DE DEMOSTRACIÓN DE:": "A DEMONSTRATION MISSION BY:",
+    "Para más información": "For more information",
     "Mi usuario": "My profile",
     "Narrador de Fútbol": "Football Narrator",
     "Análisis, narración y una nueva manera de vivir cada partido.": "Analysis, commentary and a new way to experience every match.",

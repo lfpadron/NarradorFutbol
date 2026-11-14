@@ -9,6 +9,9 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
+from src.ui.attribution import FOOTER_CREDIT, STATSBOMB_LOGO, asset_data_uri
+from src.ui.i18n import t
+
 FOOTER_TEXT = "UNA MISIÓN DE DEMOSTRACIÓN DE:"
 FOOTER_URL = "https://astrogatolabs.com.mx/"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -47,9 +50,9 @@ def render_footer() -> None:
         <style>
             .astrogato-footer {{
                 display: grid;
-                grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+                grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.7fr);
                 align-items: center;
-                gap: 24px;
+                gap: 18px;
                 margin-top: 48px;
                 padding: 18px 0 8px;
                 border-top: 1px solid rgba(148, 163, 184, 0.35);
@@ -83,16 +86,42 @@ def render_footer() -> None:
             .astrogato-footer__contact a:hover {{ text-decoration: underline; }}
             .astrogato-footer__link {{
                 display: inline-flex;
+                width: 100%;
+                max-width: 320px;
+                min-width: 0;
                 align-items: center;
                 justify-content: center;
                 text-decoration: none;
             }}
             .astrogato-footer__logo,
             .astrogato-footer__logo-placeholder {{
-                width: min(320px, 44vw);
+                width: 100%;
+                max-width: 320px;
                 max-height: 68px;
                 object-fit: contain;
                 display: block;
+            }}
+            .astrogato-footer__source {{
+                display: grid;
+                grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+                align-items: center;
+                gap: 12px;
+                font-size: 0.72rem;
+                line-height: 1.45;
+                text-align: left;
+            }}
+            .astrogato-footer__source img {{
+                display: block;
+                width: 100%;
+                height: auto;
+                object-fit: contain;
+                background: #ffffff;
+                border-radius: 4px;
+                padding: 6px;
+                box-sizing: border-box;
+            }}
+            @media (max-width: 1050px) {{
+                .astrogato-footer {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
             }}
             @media (max-width: 640px) {{
                 .astrogato-footer {{
@@ -107,6 +136,7 @@ def render_footer() -> None:
                     font-size: 0.7rem;
                 }}
                 .astrogato-footer__contact {{ width: 100%; text-align: right; }}
+                .astrogato-footer__source {{ max-width: 460px; }}
                 .astrogato-footer__logo,
                 .astrogato-footer__logo-placeholder {{
                     width: min(280px, 82vw);
@@ -115,11 +145,15 @@ def render_footer() -> None:
             }}
         </style>
         <footer class="astrogato-footer">
-            <div class="astrogato-footer__text">{FOOTER_TEXT}</div>
+            <div class="astrogato-footer__text">{t(FOOTER_TEXT)}</div>
             <div class="astrogato-footer__brand">{logo}</div>
             <div class="astrogato-footer__contact">
-                <div>Para más información</div>
+                <div>{t("Para más información")}</div>
                 <a href="mailto:lfpadron@astrogatolabs.com"><span aria-hidden="true">✉</span> lfpadron@astrogatolabs.com</a>
+            </div>
+            <div class="astrogato-footer__source">
+                <img src="{asset_data_uri(STATSBOMB_LOGO)}" alt="Hudl StatsBomb" />
+                <span>{t(FOOTER_CREDIT)}</span>
             </div>
         </footer>
         """,

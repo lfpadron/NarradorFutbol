@@ -9,10 +9,13 @@ from typing import Any
 
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
+from matplotlib.image import imread
 from matplotlib.patches import Arc, Circle, FancyArrowPatch, Rectangle
 import numpy as np
 
 from src.analytics.shot_chains import shot_chain_title
+from src.ui.attribution import SOURCE_TEXT, STATSBOMB_ICON
+from src.ui.i18n import t
 
 HOME_COLOR = "#d62728"
 AWAY_COLOR = "#1f77b4"
@@ -190,7 +193,10 @@ def _figure(chain: dict[str, Any], language: str) -> tuple[Figure, Any]:
         else "● Jugador   ★ Rematador     ━ Pase / tiro     ··· Desplazamiento"
     )
     figure.text(0.047, 0.112, legend, color=INK, size=10)
-    figure.text(0.047, 0.067, "STATSBOMB OPEN DATA  /  NARRADOR FÚTBOL", color=MUTED, size=8)
+    source_icon = figure.add_axes((0.047, 0.0495, 0.02, 0.035))
+    source_icon.imshow(imread(STATSBOMB_ICON))
+    source_icon.axis("off")
+    figure.text(0.077, 0.067, str(t(SOURCE_TEXT, language=language)), va="center", color=MUTED, size=9)
     note = (
         "Event reconstruction · interpolated movement"
         if english

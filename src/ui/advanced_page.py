@@ -22,6 +22,7 @@ from src.analytics.advanced_charts import (
 from src.analytics.db import AnalyticsDatabaseError, query_df
 from src.reports.tab_pdf import save_analysis_tab_pdf
 from src.security.streamlit_auth import require_login
+from src.ui.attribution import add_statsbomb_attribution
 from src.ui.downloads import render_download_button
 from src.ui.footer import render_footer
 from src.ui.formatters import format_score
@@ -223,7 +224,7 @@ def render_advanced_page(page_title: str = "Análisis avanzado") -> None:
             away_team_name=away_team_name,
         )
         st.plotly_chart(
-            heatmap_fig,
+            add_statsbomb_attribution(heatmap_fig),
             width="stretch",
         )
         render_pdf_button(
@@ -237,7 +238,7 @@ def render_advanced_page(page_title: str = "Análisis avanzado") -> None:
     with chart_tabs[1]:
         st.subheader("Mapa de tiros")
         shots_fig = plot_shots_advanced_page(bundle.get("shots", []), home_team_name, away_team_name)
-        st.plotly_chart(shots_fig, width="stretch")
+        st.plotly_chart(add_statsbomb_attribution(shots_fig), width="stretch")
         render_pdf_button(
             "graficas_avanzadas_tiros",
             f"Mapa de tiros | {match_score_label}",
@@ -250,7 +251,7 @@ def render_advanced_page(page_title: str = "Análisis avanzado") -> None:
         st.subheader("Mapa de pases")
         st.caption("Muestra hasta 350 flechas para mantener la interacción fluida.")
         pass_map_fig = plot_pass_map_page(bundle.get("passes", []), home_team_name, away_team_name)
-        st.plotly_chart(pass_map_fig, width="stretch")
+        st.plotly_chart(add_statsbomb_attribution(pass_map_fig), width="stretch")
         render_pdf_button(
             "graficas_avanzadas_pases",
             f"Mapa de pases | {match_score_label}",
@@ -273,7 +274,7 @@ def render_advanced_page(page_title: str = "Análisis avanzado") -> None:
             )
         elif bundle.get("pass_network"):
             pass_network_fig = plot_pass_network(bundle["pass_network"])
-            st.plotly_chart(pass_network_fig, width="stretch")
+            st.plotly_chart(add_statsbomb_attribution(pass_network_fig), width="stretch")
             network = bundle.get("pass_network") or {}
             pass_network_sections.extend(
                 [
@@ -306,7 +307,7 @@ def render_advanced_page(page_title: str = "Análisis avanzado") -> None:
             bundle.get("recovery_loss", []), home_team_name, away_team_name
         )
         st.plotly_chart(
-            recoveries_losses_fig,
+            add_statsbomb_attribution(recoveries_losses_fig),
             width="stretch",
         )
         render_pdf_button(
@@ -320,7 +321,7 @@ def render_advanced_page(page_title: str = "Análisis avanzado") -> None:
     with chart_tabs[5]:
         st.subheader("Momentum por intervalos")
         momentum_fig = plot_momentum_page(bundle.get("momentum", []), home_team_name, away_team_name)
-        st.plotly_chart(momentum_fig, width="stretch")
+        st.plotly_chart(add_statsbomb_attribution(momentum_fig), width="stretch")
         st.subheader("Momento del partido")
         broadcast_momentum_fig = plot_broadcast_momentum(
             bundle.get("momentum", []),
@@ -329,7 +330,7 @@ def render_advanced_page(page_title: str = "Análisis avanzado") -> None:
             shots=bundle.get("match_shots", bundle.get("shots", [])),
         )
         st.plotly_chart(
-            broadcast_momentum_fig,
+            add_statsbomb_attribution(broadcast_momentum_fig),
             width="stretch",
         )
         render_pdf_button(
@@ -343,7 +344,7 @@ def render_advanced_page(page_title: str = "Análisis avanzado") -> None:
     with chart_tabs[6]:
         st.subheader("Zonas de dominio o presencia")
         zones_fig = plot_presence_zones(bundle.get("zones", []), selected_team=team_filter)
-        st.plotly_chart(zones_fig, width="stretch")
+        st.plotly_chart(add_statsbomb_attribution(zones_fig), width="stretch")
         zones_frame = pd.DataFrame(bundle.get("zones", []))
         sorted_zones_frame = (
             zones_frame.sort_values(["share_pct", "events"], ascending=False)

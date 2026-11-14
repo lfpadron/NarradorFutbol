@@ -14,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.security.storage import initialize_security
 from src.security.streamlit_auth import PROFILE_PAGE, current_user
+from src.ui.attribution import render_sidebar_branding
 from src.ui.i18n import current_language, install_streamlit_i18n, render_language_selector, t
 from src.ui.navigation import NAVIGATION_SHELL_SESSION_KEY, build_streamlit_pages, render_sidebar_navigation
 from src.ui.page_config import soccer_page_icon
@@ -29,6 +30,7 @@ user = current_user()
 pages = build_streamlit_pages(language, user)
 page = st.navigation(pages, position="hidden")
 st.session_state[NAVIGATION_SHELL_SESSION_KEY] = True
+render_sidebar_branding()
 render_language_selector()
 render_sidebar_navigation(language, pages, user)
 install_streamlit_i18n()

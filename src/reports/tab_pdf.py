@@ -111,9 +111,15 @@ def _render_pdf(
 
 def _figure_image(figure: Any, language: str = "es") -> tuple[Any | None, str | None]:
     try:
+        import plotly.graph_objects as go
         from reportlab.lib.units import inch
         from reportlab.platypus import Image
 
+        from src.ui.attribution import add_statsbomb_attribution
+
+        # Match the source band to the export canvas without changing the on-screen figure.
+        if isinstance(figure, go.Figure):
+            figure = add_statsbomb_attribution(go.Figure(figure), language=language, height=560)
         data = figure.to_image(format="png", width=980, height=560, scale=1)
         image = Image(BytesIO(data))
         image.drawWidth = 7.25 * inch

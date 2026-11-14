@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from src.security.models import can_access_page
+from src.ui.attribution import render_sidebar_branding
 from src.ui.i18n import DEFAULT_LANGUAGE, current_language, install_streamlit_i18n, render_language_selector, t
 from src.ui.page_config import soccer_page_icon
 
@@ -190,6 +191,7 @@ def ensure_page_shell(page_title: str, layout: Literal["wide", "centered"] = "wi
         page_icon=soccer_page_icon(),
         layout=layout,
     )
+    render_sidebar_branding()
     render_language_selector()
     from src.security.storage import initialize_security
     from src.security.streamlit_auth import current_user

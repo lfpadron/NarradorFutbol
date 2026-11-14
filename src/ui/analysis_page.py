@@ -64,6 +64,7 @@ from src.scouting.scouting_v2 import generate_scouting_v2
 from src.scouting.scouting_v2_report import save_scouting_v2_report
 from src.security.streamlit_auth import require_login
 from src.ui.charts import momentum_line, shots_on_target_bar, xg_bar, xg_difference_line, xg_difference_timeline
+from src.ui.attribution import add_statsbomb_attribution
 from src.ui.downloads import render_download_button, render_export_downloads
 from src.ui.footer import render_footer
 from src.ui.formatters import format_float, format_pct, format_score
@@ -805,12 +806,12 @@ def render_analysis_page(page_title: str) -> None:
             shots_on_target_fig = shots_on_target_bar(detail["shots"], home_team, away_team)
             xg_team_fig = xg_bar(team_stats, home_team, away_team)
 
-            st.plotly_chart(shot_map_fig, width="stretch")
-            st.plotly_chart(cumulative_xg_fig, width="stretch")
+            st.plotly_chart(add_statsbomb_attribution(shot_map_fig), width="stretch")
+            st.plotly_chart(add_statsbomb_attribution(cumulative_xg_fig), width="stretch")
 
             chart_cols = st.columns(2)
-            chart_cols[0].plotly_chart(shots_on_target_fig, width="stretch")
-            chart_cols[1].plotly_chart(xg_team_fig, width="stretch")
+            chart_cols[0].plotly_chart(add_statsbomb_attribution(shots_on_target_fig), width="stretch")
+            chart_cols[1].plotly_chart(add_statsbomb_attribution(xg_team_fig), width="stretch")
             st.dataframe(pd.DataFrame(detail["shots"]), width="stretch")
             render_tab_pdf_button(
                 "tiros_xg",
@@ -855,14 +856,14 @@ def render_analysis_page(page_title: str) -> None:
                 home_team,
                 away_team,
             )
-            st.plotly_chart(pass_map_fig, width="stretch")
+            st.plotly_chart(add_statsbomb_attribution(pass_map_fig), width="stretch")
             st.dataframe(pd.DataFrame(detail["progressive_passes"]), width="stretch")
 
             pass_figures = [pass_map_fig]
             if teams:
                 network_team = st.selectbox("Equipo para red de pases", teams)
                 pass_network_fig = plot_pass_network(load_pass_network(match_id, network_team))
-                st.plotly_chart(pass_network_fig, width="stretch")
+                st.plotly_chart(add_statsbomb_attribution(pass_network_fig), width="stretch")
                 pass_figures.append(pass_network_fig)
             else:
                 st.info("No hay equipos disponibles para construir red de pases.")
@@ -900,7 +901,7 @@ def render_analysis_page(page_title: str) -> None:
                 home_team,
                 away_team,
             )
-            st.plotly_chart(pressure_fig, width="stretch")
+            st.plotly_chart(add_statsbomb_attribution(pressure_fig), width="stretch")
             st.dataframe(pd.DataFrame(detail["pressures"]), width="stretch")
             render_tab_pdf_button(
                 "presion",
@@ -917,7 +918,7 @@ def render_analysis_page(page_title: str) -> None:
             st.write("Fórmula MVP: tiros * 3 + xG * 10 + entradas al tercio final * 1 " "+ eventos ofensivos * 0.5.")
             momentum = detail["momentum"]
             momentum_fig = momentum_line(momentum, home_team, away_team)
-            st.plotly_chart(momentum_fig, width="stretch")
+            st.plotly_chart(add_statsbomb_attribution(momentum_fig), width="stretch")
             st.dataframe(pd.DataFrame(momentum), width="stretch")
             render_tab_pdf_button(
                 "momentum",
@@ -1966,15 +1967,15 @@ def render_analysis_page(page_title: str) -> None:
                     metric_bars_fig = plot_player_metric_bars(current_player_comparison, comparison_colors)
                     profile_groups_fig = plot_player_profile_groups(current_player_comparison, comparison_colors)
                     st.markdown("### Radar comparativo")
-                    st.plotly_chart(radar_fig, width="stretch")
+                    st.plotly_chart(add_statsbomb_attribution(radar_fig), width="stretch")
 
                     visual_cols = st.columns(2)
                     with visual_cols[0]:
                         st.markdown("### Métricas comparativas")
-                        st.plotly_chart(metric_bars_fig, width="stretch")
+                        st.plotly_chart(add_statsbomb_attribution(metric_bars_fig), width="stretch")
                     with visual_cols[1]:
                         st.markdown("### Perfil por grupos")
-                        st.plotly_chart(profile_groups_fig, width="stretch")
+                        st.plotly_chart(add_statsbomb_attribution(profile_groups_fig), width="stretch")
 
                     st.markdown("### Fortalezas y debilidades")
                     sw_cols = st.columns(2)
@@ -2385,7 +2386,7 @@ def render_analysis_page(page_title: str) -> None:
 
                     v2_colors = player_chart_colors(profile_a.get("team_name"), profile_b.get("team_name"))
                     v2_radar_fig = plot_player_radar(current_v2.get("radar_metrics", {}), v2_colors)
-                    st.plotly_chart(v2_radar_fig, width="stretch")
+                    st.plotly_chart(add_statsbomb_attribution(v2_radar_fig), width="stretch")
                     strength_cols = st.columns(2)
                     with strength_cols[0]:
                         st.markdown("#### Fortalezas A")
@@ -2561,7 +2562,7 @@ def render_analysis_page(page_title: str) -> None:
             xg_diff_cols[1].metric(f"xG visitante ({away_team})", format_float(total_away_xg))
             xg_diff_cols[2].metric(f"xG local ({home_team})", format_float(total_home_xg))
 
-            st.plotly_chart(xg_diff_fig, width="stretch")
+            st.plotly_chart(add_statsbomb_attribution(xg_diff_fig), width="stretch")
             st.dataframe(pd.DataFrame(xg_diff_rows), width="stretch")
             render_tab_pdf_button(
                 "xg_visitante_local",

@@ -20,12 +20,12 @@ def _load_chains(match_id: int, home_team: str, away_team: str) -> list[dict[str
 @st.cache_data(show_spinner=False, max_entries=24)
 def _chart_png(chain: dict[str, Any], language: str) -> bytes:
     with RENDER_LOCK:
-        return render_shot_chain_png(chain, language)
+        return render_shot_chain_png(chain, language=language)
 
 
 @st.cache_data(show_spinner=False, max_entries=12)
 def _video(chain: dict[str, Any], language: str) -> bytes:
-    return shot_chain_video(chain, language)
+    return shot_chain_video(chain, language=language)
 
 
 def render_shot_chain_panel(match_id: int, home_team: str, away_team: str, *, animated: bool = False) -> None:
