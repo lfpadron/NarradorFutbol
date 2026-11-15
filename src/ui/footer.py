@@ -36,6 +36,13 @@ def _ball_data_uri() -> str:
 
 
 def render_footer() -> None:
+    with st.sidebar:
+        st.divider()
+        st.session_state["narrador_cursor_animation"] = st.checkbox(
+            t("Activar animación de cursor"),
+            value=st.session_state.get("narrador_cursor_animation", False),
+            key="_narrador_cursor_animation",
+        )
     _render_pointer_trail()
     logo_uri = _logo_data_uri()
     logo = (
@@ -162,9 +169,7 @@ def render_footer() -> None:
 
 
 def _render_pointer_trail() -> None:
-    ball_uri = _ball_data_uri()
-    if not ball_uri:
-        return
+    ball_uri = _ball_data_uri() if st.session_state.get("narrador_cursor_animation", False) else ""
 
     components.html(
         f"""
@@ -175,6 +180,13 @@ def _render_pointer_trail() -> None:
             const previous = doc.__narradorFootballPointerTrailHandler;
             if (previous) {{
                 doc.removeEventListener("pointermove", previous);
+            }}
+            delete doc.__narradorFootballPointerTrailHandler;
+            doc.querySelectorAll(".narrador-football-pointer-trail").forEach((ball) => ball.remove());
+            const iconSrc = "{ball_uri}";
+            if (!iconSrc) {{
+                doc.getElementById(styleId)?.remove();
+                return;
             }}
             if (!doc.getElementById(styleId)) {{
                 const style = doc.createElement("style");
@@ -204,7 +216,6 @@ def _render_pointer_trail() -> None:
                 doc.head.appendChild(style);
             }}
 
-            const iconSrc = "{ball_uri}";
             let lastSpawn = 0;
             let rotation = 0;
             const reduceMotion = window.parent.matchMedia("(prefers-reduced-motion: reduce)");

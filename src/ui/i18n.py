@@ -33,6 +33,7 @@ _EN_TRANSLATIONS: dict[str, str] = {
     ),
     "UNA MISIÓN DE DEMOSTRACIÓN DE:": "A DEMONSTRATION MISSION BY:",
     "Para más información": "For more information",
+    "Activar animación de cursor": "Enable cursor animation",
     "Mi usuario": "My profile",
     "Narrador de Fútbol": "Football Narrator",
     "Análisis, narración y una nueva manera de vivir cada partido.": "Analysis, commentary and a new way to experience every match.",
